@@ -1,8 +1,0 @@
-pear，梨
-grape，葡萄
-peach，桃
-
-Greece，希腊
-climate，气候
-country，国家
-pleasant，宜人的
