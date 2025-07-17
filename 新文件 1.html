@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>单词拼写闯关游戏</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f8ff;
+      padding: 20px;
+      text-align: center;
+    }
+    #game-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #333;
+    }
+    .letter-input, .fixed-letter {
+      width: 30px;
+      height: 36px;
+      font-size: 20px;
+      margin: 3px;
+      text-align: center;
+      border: none;
+      border-bottom: 2px solid #000;
+      background: transparent;
+    }
+    .letter-input.correct {
+      animation: pop 0.3s ease;
+    }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+    .letter-box {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    .option-btn {
+      display: block;
+      margin: 6px auto;
+      width: 80%;
+    }
+    #definition {
+      margin: 10px;
+      font-size: 16px;
+      color: #4CAF50; 
+    }
+    #stats {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #666;
+    }
+    audio {
+      display: none;
+    }
+    .streak-effect {
+      position: fixed;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 32px;
+      font-weight: bold;
+      color: #ff9800;
+      opacity: 0;
+      animation: streak 1s forwards;
+      pointer-events: none;
+    }
+    @keyframes streak {
+      0% { opacity: 0; transform: translate(-50%, -20px); }
+      50% { opacity: 1; transform: translate(-50%, 0); }
+      100% { opacity: 0; transform: translate(-50%, 20px); }
+    }
+    .stars {
+      color: #ffd700;
+      font-size: 24px;
+      margin: 10px 0;
+    }
+    .file-notification {
+      color: #f44336;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+<div id="game-container">
+  <h1>单词拼写闯关游戏</h1>
+  <audio id="bgm" autoplay loop>
+    <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"> ></audio>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_371f292d82.mp3"> ></audio>
+  
+  <!-- 新增：文件选择区域 -->
+  <div id="fileSelector" style="margin-bottom: 15px;">
+    <label>选择单词文件：</label>
+    <select id="wordFileSelect" onchange="loadSelectedWordFile()">
+      <option value="default">默认单词库</option>
+      <!-- 其他文件选项将动态添加 -->
+    </select>
+    <button onclick="deleteCurrentFile()" id="deleteFileBtn" style="background-color: #f44336;">删除文件进度</button>
+    <div id="fileNotification" class="file-notification"></div>
+  </div>
+  
+  <div id="content">
+    <div id="instruction"></div>
+    <div id="definition"></div>
+    <div id="question"></div>
+    <div class="letter-box" id="letterBox"></div>
+    <div>
+      <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
+      <button onclick="submitAnswer()" id="nextBtn" disabled>跳过此题</button>
+      <button onclick="readWord()">🔊 听单词</button>
+      <button onclick="resetProgress()" class="reset-btn">重置进度</button>
+      <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
+      <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
+    </div>
+    <div id="options"></div>
+    <div id="result"></div>
+    <div id="stats"></div>
+  </div>
+</div>
+<script>
+  // 原始单词列表
+  const defaultWordList = [
+    {word:"morning", definition:"早晨；上午"},
+    {word:"afternoon", definition:"午后；下午"},
+    {word:"evening", definition:"晚上；傍晚"},
+    {word:"night", definition:"夜间；夜晚"},
+    {word:"fine", definition:"好的"},
+    {word:"thank", definition:"感谢"},
+    {word:"goodbye", definition:"再见"},
+    {word:"woof", definition:"狗叫声"},
+    {word:"Mrs", definition:"夫人；太太"},
+    {word:"day", definition:"一天"},
+    {word:"today", definition:"今天"},
+    {word:"very", definition:"很；非常"},
+    {word:"well", definition:"健康的；身体好的"},
+    {word:"hope", definition:"希望"},
+    {word:"too", definition:"太；也"},
+    {word:"apple", definition:"苹果"},
+    {word:"bag", definition:"包"},
+    {word:"boy", definition:"男孩"},
+    {word:"girl", definition:"女孩"},
+    {word:"big", definition:"大的"},
+    {word:"small", definition:"小的"},
+    {word:"short", definition:"矮的；短的"},
+    {word:"thin", definition:"瘦的；薄的"},
+    {word:"Miss", definition:"女士；小姐"},
+    {word:"cat", definition:"猫"},
+    {word:"dog", definition:"狗"},
+    {word:"seven", definition:"七"},
+    {word:"eight", definition:"八"},
+    {word:"nine", definition:"九"},
+    {word:"ten", definition:"十"},
+    {word:"touch", definition:"触摸"},
+    {word:"knee", definition:"膝盖"},
+    {word:"pick up", definition:"捡起；拾起"},
+    {word:"stick", definition:"枯枝；木棍"},
+    {word:"draw", definition:"画；绘画"},
+    {word:"snake", definition:"蛇"},
+    {word:"again", definition:"再一次"},
+    {word:"sorry", definition:"抱歉的；对不起"},
+    {word:"elephant", definition:"大象"},
+    {word:"five", definition:"五"},
+    {word:"run", definition:"跑"},
+    {word:"write", definition:"写"},
+    {word:"swim", definition:"游泳"},
+    {word:"fly", definition:"飞"},
+    {word:"sing", definition:"唱（歌）"},
+    {word:"skip", definition:"跳绳"},
+    {word:"ride", definition:"骑（马；车）"},
+    {word:"bicycle", definition:"单车，自行车"},
+    {word:"supergirl", definition:"超级女孩"},
+    {word:"but", definition:"但是"},
+    {word:"hand", definition:"手"},
+    {word:"gate", definition:"大门"},
+    {word:"plate", definition:"盘子"},
+    {word:"young", definition:"年轻的"},
+    {word:"old", definition:"老的；旧的"},
+    {word:"family", definition:"家庭"},
+    {word:"friend", definition:"朋友"},
+    {word:"who", definition:"谁"},
+    {word:"brother", definition:"兄弟"},
+    {word:"sister", definition:"姐妹"},
+    {word:"grandmother", definition:"祖母；奶奶；外婆"},
+    {word:"mummy", definition:"（口语）妈妈"},
+    {word:"daddy", definition:"（口语）爸爸"},
+    {word:"kind and dear", definition:"和蔼可亲的"},
+    {word:"nice", definition:"美好的"},
+    {word:"sweet", definition:"甜的"},
+    {word:"insect", definition:"昆虫"},
+    {word:"jar", definition:"玻璃罐"},
+    {word:"hair", definition:"头发"},
+    {word:"head", definition:"头"},
+    {word:"face", definition:"脸"},
+    {word:"mouth", definition:"嘴"},
+    {word:"eye", definition:"眼睛"},
+    {word:"my", definition:"我的"},
+    {word:"your", definition:"你的"},
+    {word:"giant", definition:"巨人"},
+    {word:"like", definition:"喜欢"},
+    {word:"long", definition:"长的"},
+    {word:"kite", definition:"风筝"},
+    {word:"lion", definition:"狮子"},
+    {word:"look", definition:"看；看起来"},
+    {word:"slide", definition:"滑梯"},
+    {word:"swing", definition:"秋千"},
+    {word:"seesaw", definition:"跷跷板"},
+    {word:"bee", definition:"蜜蜂"},
+    {word:"yellow", definition:"黄色（的）"},
+    {word:"up", definition:"向上"},
+    {word:"down", definition:"向下"},
+    {word:"play", definition:"（尤指儿童）玩；玩耍"},
+    {word:"see", definition:"看见"},
+    {word:"they", definition:"他（她；它）们"},
+    {word:"mouse", definition:"老鼠"},
+    {word:"net", definition:"网"},
+    {word:"man", definition:"男人"},
+    {word:"bag", definition:"包"},
+    {word:"box", definition:"箱子；盒子"},
+    {word:"desk", definition:"书桌"},
+    {word:"chair", definition:"椅子"},
+    {word:"book", definition:"书"},
+    {word:"pencil", definition:"铅笔"},
+    {word:"pencil case", definition:"铅笔盒"},
+    {word:"car", definition:"汽车"},
+    {word:"bear", definition:"熊"},
+    {word:"put", definition:"放"},
+    {word:"in", definition:"在……里面"},
+    {word:"on", definition:"在……上面"},
+    {word:"room", definition:"房间"},
+    {word:"love", definition:"喜爱"},
+    {word:"like", definition:"像；如同；喜欢"},
+    {word:"use", definition:"使用"},
+    {word:"every", definition:"每个；每一"},
+    {word:"keep", definition:"保持"},
+    {word:"clean", definition:"清洁"},
+    {word:"orange", definition:"橙色；橙子"},
+    {word:"pig", definition:"猪"},
+    {word:"has", definition:"有（have 三单形式）"},
+    {word:"for", definition:"给；为了"},
+    {word:"her", definition:"她的；她"},
+    {word:"with", definition:"和……一起"},
+    {word:"leg", definition:"腿"},
+    {word:"come", definition:"来；来到"},
+    {word:"eat", definition:"吃"},
+    {word:"bowl", definition:"碗"},
+    {word:"plate", definition:"盘子"},
+    {word:"spoon", definition:"勺子"},
+    {word:"chopsticks", definition:"筷子"},
+    {word:"cook", definition:"做饭"},
+    {word:"dinner", definition:"晚餐"},
+    {word:"thanks", definition:"谢谢"},
+    {word:"give", definition:"给"},
+    {word:"ready", definition:"准备好（做某事）的"},
+    {word:"here", definition:"在这里；此时"},
+    {word:"How many", definition:"多少"},
+    {word:"kitchen", definition:"厨房"},
+    {word:"naughty", definition:"顽皮的"},
+    {word:"jump", definition:"跳"},
+    {word:"floor", definition:"地板"},
+    {word:"under", definition:"在……下面"},
+    {word:"queen", definition:"女王；王后"},
+    {word:"rabbit", definition:"兔子"},
+    {word:"sit", definition:"坐"},
+    {word:"sun", definition:"太阳"},
+    {word:"moon", definition:"月亮"},
+    {word:"star", definition:"星星"},
+    {word:"sky", definition:"天空"},
+    {word:"bright", definition:"明亮的"},
+    {word:"twinkle", definition:"闪烁；闪耀"},
+    {word:"wonder", definition:"想知道"},
+    {word:"above", definition:"在……上面"},
+    {word:"world", definition:"世界"},
+    {word:"high", definition:"高的"},
+    {word:"diamond", definition:"钻石"},
+    {word:"soup", definition:"汤"},
+    {word:"soft", definition:"柔软的"},
+    {word:"smooth", definition:"光滑的"},
+    {word:"eat", definition:"吃"},
+    {word:"fox", definition:"狐狸"},
+    {word:"hippo", definition:"河马"},
+    {word:"meat", definition:"肉"},
+    {word:"grass", definition:"草；草地"},
+    {word:"wild", definition:"野生的"},
+    {word:"animal", definition:"动物"},
+    {word:"lion", definition:"狮子"},
+    {word:"monkey", definition:"猴子"},
+    {word:"banana", definition:"香蕉"},
+    {word:"run", definition:"跑"},
+    {word:"cute", definition:"可爱的"},
+    {word:"white", definition:"白色（的）"},
+    {word:"hop", definition:"单脚跳"},
+    {word:"naughty", definition:"顽皮的"},
+    {word:"brown", definition:"棕色（的）"},
+    {word:"swing", definition:"秋千"},
+    {word:"umbrella", definition:"雨伞"},
+    {word:"van", definition:"（厢式）小型货车"},
+    {word:"take", definition:"拿；取走"},
+    {word:"raindrop", definition:"雨滴"},
+    {word:"fall", definition:"掉落"},
+    {word:"close", definition:"关闭"},
+    {word:"window", definition:"窗户"},
+    {word:"flower", definition:"花"},
+    {word:"tree", definition:"树"},
+    {word:"pick", definition:"采；摘（花、果）"},
+    {word:"climb", definition:"攀爬"},
+    {word:"colour", definition:"颜色；涂颜色"},
+    {word:"cut", definition:"切；割；剪"},
+    {word:"beautiful", definition:"美丽的"},
+    {word:"help", definition:"帮助"},
+    {word:"cry", definition:"哭；哭泣"},
+    {word:"zebra", definition:"斑马"},
+    {word:"zoo", definition:"动物园"},
+    {word:"white", definition:"白色（的）"},
+    {word:"purple", definition:"紫色（的）"},
+    {word:"pink", definition:"粉红色（的）"},
+    {word:"orange", definition:"橙色（的）"},
+    {word:"brown", definition:"棕色（的）"},
+    {word:"black", definition:"黑色（的）"},
+    {word:"green", definition:"绿色（的）"},
+    {word:"yellow", definition:"黄色（的）"},
+    {word:"blue", definition:"蓝色（的）"},
+    {word:"red", definition:"红色（的）"},
+    {word:"rainbow", definition:"彩虹"},
+    {word:"shine", definition:"发光；照耀"},
+    {word:"outside", definition:"在外面"},
+    {word:"window", definition:"窗户"},
+    {word:"pear", definition:"梨"},
+    {word:"rabbit", definition:"兔子"},
+    {word:"apple", definition:"苹果"},
+    {word:"bird", definition:"鸟"},
+    {word:"butterfly", definition:"蝴蝶"},
+    {word:"watch", definition:"观看；注视"},
+    {word:"go out", definition:"出去"},
+    {word:"house", definition:"房屋"},
+    {word:"want", definition:"想要"},
+    {word:"some", definition:"有些；一些"},
+    {word:"sleep", definition:"睡觉"},
+    {word:"little", definition:"一点儿；少量的"}
+  ];
+
+  const puzzleQuestions = [
+    { question: "“日出大米”猜一个字？", options: ["明", "昌", "早", "亮"], answer: "昌" },
+    { question: "2，4，8，16，__？", options: ["24", "32", "48", "64"], answer: "32" },
+    { question: "小明从楼上掉下来却没受伤，为什么？", options: ["地上有垫子", "他是超人", "他在做梦", "楼层低"], answer: "他在做梦" },
+    { question: "什么东西越洗越脏？", options: ["衣服", "水", "手", "海绵"], answer: "水" },
+    { question: "哪种钥匙打不开门？", options: ["汽车钥匙", "房门钥匙", "笑话", "保险箱钥匙"], answer: "笑话" },
+    { question: "一只手能拍多少个响？", options: ["一个", "两个", "三个", "四个"], answer: "一个" },
+    { question: "什么东西有五个头，但人不觉得它怪？", options: ["怪物", "手", "脚", "蛇"], answer: "手" },
+    { question: "1，3，5，7，9，__？", options: ["10", "11", "12", "13"], answer: "11" },
+    { question: "什么东西晚上才会长出尾巴？", options: ["流星", "月亮", "影子", "猫"], answer: "流星" },
+    { question: "什么东西见者有份？", options: ["礼物", "阳光", "空气", "风景"], answer: "阳光" },
+    { question: "什么东西越生气，它就越大？", options: ["气球", "脾气", "伤口", "火焰"], answer: "脾气" },
+    { question: "“一加一不是二”猜一个字？", options: ["王", "丰", "田", "由"], answer: "王" },
+    { question: "3，6，9，12，__？", options: ["13", "14", "15", "16"], answer: "15" },
+    { question: "什么东西人们在不停地吃它，却永远吃不饱？", options: ["空气", "零食", "知识", "米饭"], answer: "空气" },
+    { question: "什么东西能载动一百捆干草，却托不起一粒沙子？", options: ["船", "车", "水", "风"], answer: "水" },
+    { question: "什么东西有腿却不能走路？", options: ["桌子", "狗", "蛇", "人"], answer: "桌子" },
+    { question: "“十字对十字，太阳对月亮”猜一个字？", options: ["朝", "萌", "明", "冒"], answer: "朝" },
+    { question: "5，10，15，20，__？", options: ["22", "25", "30", "35"], answer: "25" },
+    { question: "什么东西天气越热，它爬得越高？", options: ["温度计", "太阳", "汗水", "影子"], answer: "温度计" },
+    { question: "什么东西打破了才能吃？", options: ["鸡蛋", "玻璃", "石头", "西瓜"], answer: "鸡蛋" },
+    { question: "什么东西洗好了却不能吃？", options: ["衣服", "水果", "蔬菜", "米饭"], answer: "衣服" },
+    { question: "“一边红，一边绿，一边喜雨，一边喜风”猜一个字？", options: ["秋", "明", "晴", "阳"], answer: "秋" },
+    { question: "1，1，2，3，5，__？", options: ["7", "8", "9", "10"], answer: "8" },
+    { question: "什么东西没脚走天下？", options: ["船", "车", "风", "路"], answer: "船" },
+    { question: "什么东西有嘴不说话，有脚不走路？", options: ["桌子", "茶壶", "电脑", "手机"], answer: "茶壶" },
+    { question: "什么东西越剪越大？", options: ["洞", "纸", "布", "头发"], answer: "洞" },
+    { question: "“有头无颈，有眼无眉，无脚能走，有翅难飞”猜一动物？", options: ["鱼", "蛇", "蛙", "鸟"], answer: "鱼" },
+    { question: "2，3，5，7，11，__？", options: ["12", "13", "14", "15"], answer: "13" }
+  ];
+
+  // 多文件支持 - 预定义的单词库文件名（需放在与HTML相同目录下）
+  const predefinedWordFiles = [
+    {id: "basic", name: "基础单词库", filename: "basic_words.txt"},
+    {id: "intermediate", name: "中级单词库", filename: "intermediate_words.txt"},
+    {id: "advanced", name: "高级单词库", filename: "advanced_words.txt"},
+    {id: "animals", name: "动物单词库", filename: "animal_words.txt"},
+    {id: "food", name: "食物单词库", filename: "food_words.txt"}
+  ];
+
+  // 单词文件存储
+  let wordFiles = {
+    "default": { name: "默认单词库", words: defaultWordList, isCustom: false }
+  };
+  let currentFile = "default";
+
+  // 游戏变量 - 从本地存储加载或初始化
+  let gameData = JSON.parse(localStorage.getItem('wordGameData')) || {
+    currentIndex: 0,
+    level: 0,
+    correctCount: 0,
+    wrongList: [],
+    levelStars: [],
+    puzzleQuestionsUsed: []
+  };
+
+  // 同步变量到内存
+  let currentIndex = gameData.currentIndex;
+  let level = gameData.level;
+  let inPuzzle = false;
+  let correctCount = gameData.correctCount;
+  let wrongList = gameData.wrongList;
+  let isReviewMode = false;
+  let currentStreak = 0;
+  let levelStars = gameData.levelStars;
+  let currentReviewIndex = 0;
+  let levelCorrect = 0;
+  let recognition; // 语音识别对象
+
+  // 标记已使用的谜题
+  puzzleQuestions.forEach(q => {
+    if (gameData.puzzleQuestionsUsed.includes(puzzleQuestions.indexOf(q))) {
+      q.used = true;
+    }
+  });
+
+  const instructionEl = document.getElementById("instruction");
+  const questionEl = document.getElementById("question");
+  const resultEl = document.getElementById("result");
+  const optionsEl = document.getElementById("options");
+  const definitionEl = document.getElementById("definition");
+  const letterBox = document.getElementById("letterBox");
+  const statsEl = document.getElementById("stats");
+  const nextBtn = document.getElementById("nextBtn");
+  const startReadingBtn = document.getElementById("startReadingBtn");
+  const deleteFileBtn = document.getElementById("deleteFileBtn");
+  const fileNotification = document.getElementById("fileNotification");
+
+  const correctSound = document.getElementById("correct-sound");
+  const wrongSound = document.getElementById("wrong-sound");
+
+  // 初始化文件选择器
+  function initFileSelector() {
+    const selectEl = document.getElementById("wordFileSelect");
+    const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+    
+    // 添加预定义的单词库文件选项
+    predefinedWordFiles.forEach(file => {
+      // 检查文件是否已加载过
+      if (!wordFiles[file.id]) {
+        wordFiles[file.id] = {
+          name: file.name,
+          filename: file.filename,
+          words: [],
+          isCustom: true,
+          loaded: false
+        };
+      }
+      
+      // 添加到选择器
+      const option = document.createElement("option");
+      option.value = file.id;
+      option.textContent = file.name;
+      selectEl.appendChild(option);
+    });
+    
+    // 从本地存储加载自定义文件进度
+    const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
+    Object.keys(savedFiles).forEach(key => {
+      if (!wordFiles[key]) {
+        wordFiles[key] = savedFiles[key];
+        
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = wordFiles[key].name;
+        selectEl.appendChild(option);
+      }
+    });
+    
+    // 更新删除按钮状态
+    updateDeleteButton();
+  }
+
+  // 更新删除按钮状态
+  function updateDeleteButton() {
+    deleteFileBtn.disabled = currentFile === "default";
+    deleteFileBtn.style.display = currentFile === "default" ? "none" : "inline-block";
+  }
+
+  // 加载选中的单词文件
+  function loadSelectedWordFile() {
+    const selectedFile = document.getElementById("wordFileSelect").value;
+    if (selectedFile && wordFiles[selectedFile]) {
+      // 保存当前文件的进度
+      saveCurrentFileProgress();
+      
+      // 切换到选中文件
+      currentFile = selectedFile;
+      fileNotification.textContent = "";
+      
+      // 检查文件是否需要加载
+      const file = wordFiles[currentFile];
+      if (!file.loaded && file.filename) {
+        loadWordFileFromServer(file);
+        return;
+      }
+      
+      // 加载文件进度
+      loadFileProgress();
+      currentIndex = 0;
+      isReviewMode = false;
+      
+      // 更新删除按钮状态
+      updateDeleteButton();
+      
+      loadNext();
+    }
+  }
+
+  // 从服务器/本地加载单词文件
+  function loadWordFileFromServer(file) {
+    fileNotification.textContent = `正在加载 ${file.name}...`;
+    
+    // 创建一个新的XMLHttpRequest
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', file.filename, true);
+    
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          // 解析TXT文件内容（每行一个单词和释义，用逗号分隔）
+          const content = xhr.responseText;
+          const words = [];
+          const lines = content.split('\n');
+          
+          lines.forEach(line => {
+            if (line.trim()) {
+              const [word, definition] = line.split(',');
+              if (word && definition) {
+                words.push({ 
+                  word: word.trim(), 
+                  definition: definition.trim() 
+                });
+              }
+            }
+          });
+          
+          if (words.length > 0) {
+            // 更新单词文件数据
+            file.words = words;
+            file.loaded = true;
+            
+            // 保存到本地存储
+            const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
+            savedFiles[file.id] = {
+              name: file.name,
+              filename: file.filename,
+              words: words,
+              isCustom: true,
+              loaded: true
+            };
+            localStorage.setItem('customWordFiles', JSON.stringify(savedFiles));
+            
+            fileNotification.textContent = `${file.name} 加载成功！共 ${words.length} 个单词。`;
+            
+            // 加载文件进度
+            loadFileProgress();
+            currentIndex = 0;
+            isReviewMode = false;
+            
+            // 更新删除按钮状态
+            updateDeleteButton();
+            
+            loadNext();
+          } else {
+            fileNotification.textContent = `错误：${file.name} 格式不正确，请确保每行包含一个单词和释义，用逗号分隔。`;
+          }
+        } catch (error) {
+          console.error("解析文件错误:", error);
+          fileNotification.textContent = `错误：无法解析 ${file.name}，请检查文件格式。`;
+        }
+      } else if (xhr.status === 404) {
+        fileNotification.textContent = `错误：未找到 ${file.name}（${file.filename}），请确保文件已放在与HTML相同的目录下。`;
+      } else {
+        fileNotification.textContent = `错误：加载 ${file.name} 失败，状态码: ${xhr.status}`;
+      }
+    }
+    
+    xhr.send();
+  }
+
+  // 保存当前文件的进度
+  function saveCurrentFileProgress() {
+    const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+    progressData[currentFile] = {
+      currentIndex,
+      level,
+      correctCount,
+      wrongList,
+      levelStars,
+      puzzleQuestionsUsed: puzzleQuestions
+        .map((q, i) => q.used ? i : null)
+        .filter(i => i !== null)
+    };
+    localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
+  }
+
+  // 加载文件的进度
+  function loadFileProgress() {
+    const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+    const fileProgress = progressData[currentFile] || {};
+    
+    // 应用文件特定的进度数据
+    currentIndex = fileProgress.currentIndex || 0;
+    level = fileProgress.level || 0;
+    correctCount = fileProgress.correctCount || 0;
+    wrongList = fileProgress.wrongList || [];
+    levelStars = fileProgress.levelStars || [];
+    
+    if (fileProgress.puzzleQuestionsUsed) {
+      puzzleQuestions.forEach((q, i) => {
+        q.used = fileProgress.puzzleQuestionsUsed.includes(i);
+      });
+    }
+  }
+
+  // 删除当前文件的进度数据（而非文件本身）
+  function deleteCurrentFile() {
+    if (currentFile === "default") {
+      alert("默认单词库不能删除");
+      return;
+    }
+    
+    if (confirm(`确定要删除"${wordFiles[currentFile].name}"的进度数据吗？`)) {
+      // 删除进度数据
+      const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+      delete progressData[currentFile];
+      localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
+      
+      // 重新加载进度
+      loadFileProgress();
+      isReviewMode = false;
+      
+      loadNext();
+    }
+  }
+
+  // 保存游戏进度到本地存储
+  function saveProgress() {
+    // 更新游戏数据
+    gameData.currentIndex = currentIndex;
+    gameData.level = level;
+    gameData.correctCount = correctCount;
+    gameData.wrongList = wrongList;
+    gameData.levelStars = levelStars;
+    gameData.puzzleQuestionsUsed = puzzleQuestions
+      .map((q, i) => q.used ? i : null)
+      .filter(i => i !== null);
+    
+    // 保存到当前文件的进度中
+    saveCurrentFileProgress();
+  }
+
+  // 重置游戏进度
+  function resetProgress() {
+    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
+      currentIndex = 0;
+      level = 0;
+      correctCount = 0;
+      wrongList = [];
+      levelStars = [];
+      puzzleQuestions.forEach(q => q.used = false);
+      saveProgress();
+      loadNext();
+    }
+  }
+
+  function updateStats() {
+    const currentWords = wordFiles[currentFile].words;
+    statsEl.textContent = `正确：${correctCount}  错误：${wrongList.length}  进度：${currentIndex} / ${currentWords.length}`;
+  }
+
+  function loadNext() {
+    resultEl.textContent = "";
+    optionsEl.innerHTML = "";
+    letterBox.innerHTML = "";
+    updateStats();
+    startReadingBtn.style.display = "none";
+    
+    // 获取当前单词列表
+    const currentWords = wordFiles[currentFile].words;
+    
+    // 控制“跳过此题”按钮的显示和启用状态
+    if (isReviewMode || inPuzzle || currentIndex < currentWords.length) {
+      nextBtn.style.display = "inline-block";
+      nextBtn.disabled = false;
+    } else {
+      nextBtn.style.display = "none";
+    }
+
+    // 错题回顾模式
+    if (isReviewMode) {
+      document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
+      // 空错题本的提示
+      if (wrongList.length === 0) {
+        instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
+        definitionEl.textContent = "继续加油哦！";
+        questionEl.textContent = "";
+        return;
+      }
+      // 确保索引在有效范围内
+      if (currentReviewIndex >= wrongList.length) {
+        currentReviewIndex = 0;
+      }
+      const wordObj = wrongList[currentReviewIndex];
+      instructionEl.textContent = `错题回顾 第 ${currentReviewIndex + 1}/${wrongList.length} 题`;
+      definitionEl.textContent = `中文提示：${wordObj.definition}`;
+      questionEl.textContent = "请补全单词：";
+      
+      // 生成输入框（首字母固定）
+      const first = document.createElement("input");
+      first.type = "text";
+      first.maxLength = 1;
+      first.className = "fixed-letter";
+      first.value = wordObj.word[0];
+      first.readOnly = true;
+      letterBox.appendChild(first);
+
+      for (let i = 1; i < wordObj.word.length; i++) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 1;
+        input.className = "letter-input";
+        input.dataset.index = i;
+        addInputListeners(input);
+        letterBox.appendChild(input);
+      }
+      letterBox.querySelector("input.letter-input")?.focus();
+      
+      // 自动播放当前单词读音
+      setTimeout(() => readWord(), 500);
+      return;
+    }
+
+    // 正常闯关模式
+    document.querySelector('button[onclick="exitReview()"]').style.display = "none";
+    const start = level * 8;
+    if (currentIndex - start >= 8) {
+      showPuzzle();
+      return;
+    }
+    if (currentIndex >= currentWords.length) {
+      instructionEl.textContent = "🎉 恭喜你完成所有单词！";
+      definitionEl.innerHTML = `总星级：${levelStars.reduce((a, b) => a + b, 0)}/${levelStars.length * 3} ⭐`;
+      questionEl.textContent = "";
+      return;
+    }
+
+    const wordObj = currentWords[currentIndex];
+    instructionEl.textContent = `第 ${level + 1} 关 第 ${currentIndex - start + 1} 个词`;
+    definitionEl.textContent = `中文提示：${wordObj.definition}`;
+    questionEl.textContent = "请在下方填写完整单词：";
+
+    // 生成输入框（首字母固定）
+    const first = document.createElement("input");
+    first.type = "text";
+    first.maxLength = 1;
+    first.className = "fixed-letter";
+    first.value = wordObj.word[0];
+    first.readOnly = true;
+    letterBox.appendChild(first);
+
+    for (let i = 1; i < wordObj.word.length; i++) {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.maxLength = 1;
+      input.className = "letter-input";
+      input.dataset.index = i;
+      addInputListeners(input);
+      letterBox.appendChild(input);
+    }
+    letterBox.querySelector("input.letter-input")?.focus();
+    
+    // 自动播放当前单词读音
+    setTimeout(() => readWord(), 500);
+  }
+
+  // 检查是否所有输入框都已填满
+  function checkAllFilled() {
+    const inputs = letterBox.querySelectorAll("input.letter-input");
+    for (let input of inputs) {
+      if (!input.value) return false;
+    }
+    return true;
+  }
+
+  // 跳过当前题目
+  function submitAnswer() {
+    if (isReviewMode) {
+      // 复习模式：直接跳转到下一个错题
+      currentReviewIndex++;
+      loadNext();
+      return;
+    }
+    
+    if (inPuzzle) {
+      // 谜题模式：直接进入下一关
+      level++;
+      levelCorrect = 0;
+      currentIndex = level * 8;
+      inPuzzle = false;
+      saveProgress();
+      loadNext();
+      return;
+    }
+    
+    // 正常闯关模式：记录错题并跳转
+    const currentWords = wordFiles[currentFile].words;
+    const currentWord = currentWords[currentIndex];
+    // 避免重复添加同一错题
+    const isAlreadyInWrong = wrongList.some(item => item.word === currentWord.word);
+    if (!isAlreadyInWrong) {
+      wrongList.push(currentWord);
+    }
+    
+    currentStreak = 0; // 重置连击
+    currentIndex++;
+    saveProgress();
+    loadNext();
+  }
+
+  // 自动检查答案
+  function autoCheckAnswer() {
+    if (!checkAllFilled()) return;
+    
+    const currentWords = wordFiles[currentFile].words;
+    const wordObj = isReviewMode 
+      ? wrongList[currentReviewIndex] 
+      : currentWords[currentIndex];
+    
+    const inputs = letterBox.querySelectorAll("input.letter-input");
+    let filled = "";
+    inputs.forEach(input => filled += input.value || "");
+    const userAns = (wordObj.word[0] + filled).toLowerCase();
+
+    if (userAns === wordObj.word.toLowerCase()) {
+      resultEl.textContent = "✅ 拼写正确！请点击开始朗读";
+      correctSound.play();
+      startReadingBtn.style.display = "inline-block";
+    } else {
+      resultEl.textContent = "❌ 拼写错误，请重新填写";
+      wrongSound.play();
+      // 清空输入框
+      inputs.forEach(input => {
+        input.value = "";
+      });
+      letterBox.querySelector("input.letter-input")?.focus();
+    }
+  }
+
+  // 初始化语音识别
+  function initRecognition() {
+    if ('webkitSpeechRecognition' in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        processRecognitionResult(transcript);
+      };
+      
+      recognition.onend = function() {
+        startReadingBtn.textContent = "开始朗读";
+        startReadingBtn.classList.remove("listening");
+      };
+      
+      recognition.onerror = function(event) {
+        console.error('语音识别错误:', event.error);
+        resultEl.textContent = "语音识别出错，请重试";
+        startReadingBtn.textContent = "开始朗读";
+        startReadingBtn.classList.remove("listening");
+      };
+    } else {
+      resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
+      startReadingBtn.disabled = true;
+    }
+  }
+
+  // 处理语音识别结果
+  function processRecognitionResult(transcript) {
+    const currentWords = wordFiles[currentFile].words;
+    const wordObj = isReviewMode 
+      ? wrongList[currentReviewIndex] 
+      : currentWords[currentIndex];
+    
+    // 比较识别结果和目标单词
+    if (transcript === wordObj.word.toLowerCase()) {
+      resultEl.textContent = "✅ 朗读正确！正在进入下一题...";
+      correctSound.play();
+      
+      // 延迟一段时间后自动进入下一题
+      setTimeout(() => {
+        if (isReviewMode) {
+          // 复习模式：从错题本中删除当前做对的题目
+          wrongList.splice(currentReviewIndex, 1);
+          // 如果删除后错题本为空，显示提示
+          if (wrongList.length === 0) {
+            instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
+            definitionEl.textContent = "继续加油哦！";
+            questionEl.textContent = "";
+            resultEl.textContent = "";
+            letterBox.innerHTML = "";
+            startReadingBtn.style.display = "none";
+            return;
+          }
+          // 保持索引不变（因为数组长度减少了1）
+          loadNext();
+        } else {
+          correctCount++;
+          currentStreak++;
+          levelCorrect++;
+          currentIndex++;
+          saveProgress();
+          loadNext();
+        }
+      }, 1000);
+    } else {
+      resultEl.textContent = `❌ 朗读不正确（你读的是: "${transcript}"），请再试一次`;
+      wrongSound.play();
+    }
+  }
+
+  // 开始监听语音输入
+  function startListening() {
+    if (!recognition) {
+      initRecognition();
+    }
+    
+    try {
+      recognition.start();
+      startReadingBtn.textContent = "正在聆听...";
+      startReadingBtn.classList.add("listening");
+      resultEl.textContent = "请朗读单词...";
+    } catch (e) {
+      resultEl.textContent = "无法启动语音识别，请重试";
+      console.error('启动语音识别失败:', e);
+    }
+  }
+
+  function readWord() {
+    const currentWords = wordFiles[currentFile].words;
+    const word = isReviewMode 
+      ? wrongList[currentReviewIndex]?.word 
+      : currentWords[currentIndex]?.word;
+      
+    if (!word) return;
+    
+    // 停止任何正在播放的语音
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(word);
+    utter.lang = "en-US";
+    utter.rate = 0.9;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function showPuzzle() {
+    inPuzzle = true;
+    letterBox.innerHTML = "";
+    optionsEl.innerHTML = "";
+    definitionEl.textContent = "";
+    resultEl.textContent = "";
+    startReadingBtn.style.display = "none";
+    nextBtn.style.display = "none";
+
+    // 计算当前关卡星级
+    const rate = levelCorrect / 8;
+    let stars = 1;
+    if (rate === 1) stars = 3;
+    else if (rate >= 0.75) stars = 2;
+    levelStars.push(stars);
+
+    const unused = puzzleQuestions.filter(q => !q.used);
+    if (unused.length === 0) {
+      levelCorrect = 0;
+      loadNext();
+      return;
+    }
+    const puzzle = unused[Math.floor(Math.random() * unused.length)];
+    puzzle.used = true;
+    questionEl.textContent = `🎯 关卡挑战：${puzzle.question}`;
+    definitionEl.innerHTML = `本关评分：${"⭐".repeat(stars)}`;
+
+    puzzle.options.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.textContent = opt;
+      btn.className = "option-btn";
+      btn.onclick = () => {
+        if (opt === puzzle.answer) {
+          resultEl.textContent = "🎉 答对了，进入下一关！";
+          correctSound.play();
+          level++;
+          levelCorrect = 0;
+          currentIndex = level * 8;
+          saveProgress();
+          setTimeout(() => {
+            inPuzzle = false;
+            loadNext();
+          }, 1000);
+        } else {
+          resultEl.textContent = "😥 再试试！";
+          wrongSound.play();
+        }
+      };
+      optionsEl.appendChild(btn);
+    });
+  }
+
+  function showMistakes() {
+    if (wrongList.length === 0) {
+      alert("目前没有错题！");
+      return;
+    }
+    isReviewMode = true;
+    currentReviewIndex = 0;
+    loadNext();
+  }
+
+  function exitReview() {
+    isReviewMode = false;
+    loadNext();
+  }
+
+  let isComposing = false;  // 处理中文输入
+  function handleInput(e) {
+    if (isComposing) return;
+    const input = e.target;
+    input.value = input.value.slice(0, 1).toLowerCase(); // 限制为小写字母
+    input.classList.add("correct");
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT') next.focus();
+    
+    // 检查是否所有输入框都已填满，如果是则自动检查答案
+    autoCheckAnswer();
+  }
+
+  function handleBackspace(e) {
+    if (e.key === "Backspace") {
+      if (e.target.value) {
+        e.target.value = "";
+        e.preventDefault();
+      } else {
+        const prev = e.target.previousElementSibling;
+        if (prev && prev.tagName === 'INPUT') {
+          prev.focus();
+          e.preventDefault();
+        }
+      }
+    }
+  }
+
+  function addInputListeners(input) {
+    input.addEventListener("input", handleInput);
+    input.addEventListener("keydown", handleBackspace);
+    input.addEventListener("compositionstart", () => isComposing = true);
+    input.addEventListener("compositionend", (e) => {
+      isComposing = false;
+      handleInput(e);
+    });
+  }
+
+  // 初始化游戏和语音识别
+  initFileSelector();
+  loadFileProgress();
+  initRecognition();
+  loadNext();
+</script>
+</body>
+</html>
+    
