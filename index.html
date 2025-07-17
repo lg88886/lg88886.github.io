@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -142,8 +141,8 @@
     <div class="letter-box" id="letterBox"></div>
     <div>
       <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
+      <button onclick="submitAnswer()" id="nextBtn" disabled>跳过此题</button>
       <button onclick="readWord()">🔊 听单词</button>
-      <button onclick="skipCurrentWord()" id="skipBtn" class="reset-btn">跳过此题</button>
       <button onclick="resetProgress()" class="reset-btn">重置进度</button>
       <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
       <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
@@ -483,25 +482,20 @@
     statsEl.textContent = `正确：${correctCount}  错误：${wrongList.length}  进度：${currentIndex} / ${wordList.length}`;
   }
 
-  function loadNext() {
-    resultEl.textContent = "";
-    optionsEl.innerHTML = "";
-    letterBox.innerHTML = "";
-    updateStats();
-    nextBtn.disabled = true;
-    startReadingBtn.style.display = "none";
-	
-	  // 控制“跳过此题”按钮的显示状态
-  // 控制“跳过此题”按钮的显示状态
-  const skipBtn = document.getElementById("skipBtn");
-  if (isReviewMode || inPuzzle) {
-    // 错题回顾模式或谜题挑战模式隐藏跳过按钮
-    skipBtn.style.display = "none";
-  } else {
-    // 正常闯关模式显示跳过按钮
-    skipBtn.style.display = "inline-block";
-  }
-
+	function loadNext() {
+	  resultEl.textContent = "";
+	  optionsEl.innerHTML = "";
+	  letterBox.innerHTML = "";
+	  updateStats();
+	  startReadingBtn.style.display = "none";
+	  
+	  // 控制“跳过此题”按钮的显示和启用状态
+	  if (isReviewMode || inPuzzle || currentIndex < wordList.length) {
+		nextBtn.style.display = "inline-block"; // 始终显示
+		nextBtn.disabled = false; // 始终启用
+	  } else {
+		nextBtn.style.display = "none"; // 完成所有单词后隐藏
+	  }
 
     // 错题回顾模式
     if (isReviewMode) {
@@ -594,27 +588,39 @@
     return true;
   }
 
-// 跳过当前题目并记录到错题本
-function skipCurrentWord() {
-  // 仅在正常闯关模式允许跳过（排除错题回顾、谜题挑战）
-  if (isReviewMode || inPuzzle) return;
-  
-  const currentWord = wordList[currentIndex];
-  // 避免重复添加同一错题
-  const isAlreadyInWrong = wrongList.some(item => item.word === currentWord.word);
-  if (!isAlreadyInWrong) {
-    wrongList.push(currentWord); // 添加到错题本
-  }
-  
-  // 重置当前连击（跳过不增加连击）
-  currentStreak = 0;
-  // 推进进度
-  currentIndex++;
-  // 保存进度到本地存储
-  saveProgress();
-  // 加载下一题
-  loadNext();
-}
+	// 跳过当前题目
+	function submitAnswer() {
+	  if (isReviewMode) {
+		// 复习模式：直接跳转到下一个错题
+		currentReviewIndex++;
+		loadNext();
+		return;
+	  }
+	  
+	  if (inPuzzle) {
+		// 谜题模式：直接进入下一关
+		level++;
+		levelCorrect = 0;
+		currentIndex = level * 8;
+		inPuzzle = false;
+		saveProgress();
+		loadNext();
+		return;
+	  }
+	  
+	  // 正常闯关模式：记录错题并跳转
+	  const currentWord = wordList[currentIndex];
+	  // 避免重复添加同一错题
+	  const isAlreadyInWrong = wrongList.some(item => item.word === currentWord.word);
+	  if (!isAlreadyInWrong) {
+		wrongList.push(currentWord); // 添加到错题本
+	  }
+	  
+	  currentStreak = 0; // 重置连击
+	  currentIndex++;
+	  saveProgress();
+	  loadNext();
+	}
 
   // 自动检查答案
   function autoCheckAnswer() {
@@ -731,44 +737,6 @@ function skipCurrentWord() {
     }
   }
 
-  let isComposing = false;  // 处理中文输入
-  function handleInput(e) {
-    if (isComposing) return;
-    const input = e.target;
-    input.value = input.value.slice(0, 1).toLowerCase(); // 限制为小写字母
-    input.classList.add("correct");
-    const next = input.nextElementSibling;
-    if (next && next.tagName === 'INPUT') next.focus();
-    
-    // 检查是否所有输入框都已填满，如果是则自动检查答案
-    autoCheckAnswer();
-  }
-
-  function handleBackspace(e) {
-    if (e.key === "Backspace") {
-      if (e.target.value) {
-        e.target.value = "";
-        e.preventDefault();
-      } else {
-        const prev = e.target.previousElementSibling;
-        if (prev && prev.tagName === 'INPUT') {
-          prev.focus();
-          e.preventDefault();
-        }
-      }
-    }
-  }
-
-  function addInputListeners(input) {
-    input.addEventListener("input", handleInput);
-    input.addEventListener("keydown", handleBackspace);
-    input.addEventListener("compositionstart", () => isComposing = true);
-    input.addEventListener("compositionend", (e) => {
-      isComposing = false;
-      handleInput(e);
-    });
-  }
-
   function readWord() {
     const word = isReviewMode 
       ? wrongList[currentReviewIndex]?.word 
@@ -784,22 +752,6 @@ function skipCurrentWord() {
     window.speechSynthesis.speak(utter);
   }
 
-  function submitAnswer() {
-    // 此函数主要用于手动触发下一题，实际流程中由语音识别正确后自动触发
-    if (inPuzzle) return;
-    
-    if (isReviewMode) {
-      currentReviewIndex++;
-      setTimeout(loadNext, 500);
-      return;
-    }
-
-    currentIndex++;
-    saveProgress();
-    setTimeout(loadNext, 500);
-    updateStats();
-  }
-
   function showPuzzle() {
     inPuzzle = true;
     letterBox.innerHTML = "";
@@ -807,6 +759,7 @@ function skipCurrentWord() {
     definitionEl.textContent = "";
     resultEl.textContent = "";
     startReadingBtn.style.display = "none";
+    nextBtn.style.display = "none";
 
     // 计算当前关卡星级
     const rate = levelCorrect / 8;
@@ -866,9 +819,47 @@ function skipCurrentWord() {
     loadNext();
   }
 
+  let isComposing = false;  // 处理中文输入
+  function handleInput(e) {
+    if (isComposing) return;
+    const input = e.target;
+    input.value = input.value.slice(0, 1).toLowerCase(); // 限制为小写字母
+    input.classList.add("correct");
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT') next.focus();
+    
+    // 检查是否所有输入框都已填满，如果是则自动检查答案
+    autoCheckAnswer();
+  }
+
+  function handleBackspace(e) {
+    if (e.key === "Backspace") {
+      if (e.target.value) {
+        e.target.value = "";
+        e.preventDefault();
+      } else {
+        const prev = e.target.previousElementSibling;
+        if (prev && prev.tagName === 'INPUT') {
+          prev.focus();
+          e.preventDefault();
+        }
+      }
+    }
+  }
+
+  function addInputListeners(input) {
+    input.addEventListener("input", handleInput);
+    input.addEventListener("keydown", handleBackspace);
+    input.addEventListener("compositionstart", () => isComposing = true);
+    input.addEventListener("compositionend", (e) => {
+      isComposing = false;
+      handleInput(e);
+    });
+  }
+
   // 初始化游戏和语音识别
   initRecognition();
   loadNext();
 </script>
 </body>
-</html>
+</html>  
