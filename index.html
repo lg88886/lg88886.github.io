@@ -132,10 +132,8 @@
   
   <div id="content">
     <div id="instruction"></div>
-	<div id="definition"></div>
-	<!-- 新增音标显示区域 -->
-	<div id="phonetic" style="margin: 10px; font-size: 16px; color: #2196F3;"></div>
-	<div id="question"></div>
+    <div id="definition"></div>
+    <div id="question"></div>
     <div class="letter-box" id="letterBox"></div>
     <div>
       <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
@@ -720,9 +718,6 @@
     // 错题回顾模式
     if (isReviewMode) {
       document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
-	  const wordObj = wrongList[currentReviewIndex];
-    // 显示音标
-      document.getElementById("phonetic").textContent = `音标：${wordObj.phonetic}`;
       // 空错题本的提示
       if (wrongList.length === 0) {
         instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
@@ -1100,4 +1095,4 @@
 </script>
 </body>
 </html>
-    
+   在中文提示下面添加音标提示
