@@ -413,7 +413,8 @@
   // 多文件支持 - 预定义的单词库文件名
   const predefinedWordFiles = [
     {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
-    {id: "intermediate", name: "中级单词库", filename: "intermediate_words.txt"}
+    {id: "intermediate", name: "中级单词库", filename: "intermediate_words.txt"},
+    {id: "advanced", name: "高级单词库", filename: "advanced_words.txt"},
   ];
 
   // 单词文件存储
@@ -467,7 +468,7 @@
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
 
-  // 初始化文件选择器 - 修复重复添加选项的问题
+	// 初始化文件选择器 - 修复重复添加选项的问题
 	function initFileSelector() {
 	  const selectEl = document.getElementById("wordFileSelect");
 	  const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
@@ -477,7 +478,7 @@
 	  selectEl.innerHTML = '';
 	  selectEl.appendChild(defaultOption);
 	  
-	  // 创建一个集合来跟踪已添加的选项
+	  // 创建一个集合来跟踪已添加的选项值
 	  const addedOptions = new Set(['default']);
 	  
 	  // 添加预定义的单词库文件选项
