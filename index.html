@@ -140,7 +140,6 @@
       <option value="default">默认单词库</option>
       <!-- 其他文件选项将动态添加 -->
     </select>
-    <button onclick="deleteCurrentFile()" id="deleteFileBtn" style="background-color: #f44336;">删除文件进度</button>
     <div id="fileNotification" class="file-notification"></div>
   </div>
   
@@ -154,7 +153,7 @@
       <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
       <button onclick="submitAnswer()" id="nextBtn">跳过此题</button>
       <button onclick="readWord()">🔊 听单词</button>
-      <button onclick="resetProgress()" class="reset-btn">重置进度</button>
+      <button onclick="resetProgress()" class="reset-btn">重置当前单词库进度</button>
       <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
       <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
     </div>
@@ -319,7 +318,6 @@
   const statsEl = document.getElementById("stats");
   const nextBtn = document.getElementById("nextBtn");
   const startReadingBtn = document.getElementById("startReadingBtn");
-  const deleteFileBtn = document.getElementById("deleteFileBtn");
   const fileNotification = document.getElementById("fileNotification");
 
   const correctSound = document.getElementById("correct-sound");
@@ -328,7 +326,6 @@
   // 初始化文件选择器
   function initFileSelector() {
     const selectEl = document.getElementById("wordFileSelect");
-    const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
     
     // 清空现有选项（保留默认选项）
     const defaultOption = selectEl.querySelector('option[value="default"]');
@@ -380,15 +377,6 @@
     
     // 恢复当前选中的文件
     selectEl.value = currentFile;
-    
-    // 更新删除按钮状态
-    updateDeleteButton();
-  }
-
-  // 更新删除按钮状态
-  function updateDeleteButton() {
-    deleteFileBtn.disabled = currentFile === "default";
-    deleteFileBtn.style.display = currentFile === "default" ? "none" : "inline-block";
   }
 
   // 加载选中的单词文件
@@ -412,9 +400,6 @@
       // 加载文件进度
       loadFileProgress();
       isReviewMode = false;
-      
-      // 更新删除按钮状态
-      updateDeleteButton();
       
       loadNext();
     }
@@ -472,9 +457,6 @@
             // 保持当前单词索引不变
             currentIndex = currentIndex; 
             isReviewMode = false;
-            
-            // 更新删除按钮状态
-            updateDeleteButton();
             
             loadNext();
           } else {
@@ -538,27 +520,6 @@
     saveCurrentFileProgress();
   });
 
-  // 删除当前文件的进度数据
-  function deleteCurrentFile() {
-    if (currentFile === "default") {
-      alert("默认单词库不能删除");
-      return;
-    }
-    
-    if (confirm(`确定要删除"${wordFiles[currentFile].name}"的进度数据吗？`)) {
-      // 删除进度数据
-      const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
-      delete progressData[currentFile];
-      localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
-      
-      // 重新加载进度
-      loadFileProgress();
-      isReviewMode = false;
-      
-      loadNext();
-    }
-  }
-
   // 保存游戏进度到本地存储
   function saveProgress() {
     // 更新游戏数据
@@ -577,7 +538,7 @@
 
   // 重置游戏进度
   function resetProgress() {
-    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
+    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的所有进度数据吗？`)) {
       currentIndex = 0;
       level = 0;
       correctCount = 0;
@@ -723,7 +684,6 @@
       level++;
       levelCorrect = 0;
       currentIndex = level * 8;
-      inPuzzle = false;
       saveProgress();
       loadNext();
       return;
@@ -841,36 +801,6 @@
     } else {
       resultEl.textContent = `❌ 朗读不正确（你读的是: "${transcript}"），请再试一次`;
       wrongSound.play();
-    }
-  }
-
-  // 初始化语音识别
-  function initRecognition() {
-    if ('webkitSpeechRecognition' in window) {
-      recognition = new webkitSpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-      
-      recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript.trim().toLowerCase();
-        processRecognitionResult(transcript);
-      };
-      
-      recognition.onend = function() {
-        startReadingBtn.textContent = "开始朗读";
-        startReadingBtn.classList.remove("listening");
-      };
-      
-      recognition.onerror = function(event) {
-        console.error('语音识别错误:', event.error);
-        resultEl.textContent = "语音识别出错，请重试";
-        startReadingBtn.textContent = "开始朗读";
-        startReadingBtn.classList.remove("listening");
-      };
-    } else {
-      resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
-      startReadingBtn.disabled = true;
     }
   }
 
