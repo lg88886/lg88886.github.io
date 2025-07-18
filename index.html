@@ -326,65 +326,65 @@
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
 
-	// 初始化文件选择器
-	function initFileSelector() {
-	  const selectEl = document.getElementById("wordFileSelect");
-	  const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
-	  
-	  // 清空现有选项（保留默认选项）
-	  const defaultOption = selectEl.querySelector('option[value="default"]');
-	  selectEl.innerHTML = '';
-	  selectEl.appendChild(defaultOption);
-	  
-	  // 创建一个集合来跟踪已添加的选项值
-	  const addedOptions = new Set(['default']);
-	  
-	  // 添加预定义的单词库文件选项
-	  predefinedWordFiles.forEach(file => {
-		// 检查文件是否已加载过
-		if (!wordFiles[file.id]) {
-		  wordFiles[file.id] = {
-			name: file.name,
-			filename: file.filename,
-			words: [],
-			isCustom: true,
-			loaded: false
-		  };
-		}
-		
-		// 只添加不存在的选项
-		if (!addedOptions.has(file.id)) {
-		  const option = document.createElement("option");
-		  option.value = file.id;
-		  option.textContent = file.name;
-		  selectEl.appendChild(option);
-		  addedOptions.add(file.id);
-		}
-	  });
-	  
-	  // 从本地存储加载自定义文件进度
-	  const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
-	  Object.keys(savedFiles).forEach(key => {
-		if (!wordFiles[key]) {
-		  wordFiles[key] = savedFiles[key];
-		}
-		
-		// 只添加不存在的选项
-		if (!addedOptions.has(key)) {
-		  const option = document.createElement("option");
-		  option.value = key;
-		  option.textContent = wordFiles[key].name;
-		  selectEl.appendChild(option);
-		  addedOptions.add(key);
-		}
-	  });
-	  
-	  // 恢复当前选中的文件
-	  selectEl.value = currentFile;
-	  
-	  // 更新删除按钮状态
-	  updateDeleteButton();
-	}
+  // 初始化文件选择器
+  function initFileSelector() {
+    const selectEl = document.getElementById("wordFileSelect");
+    const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+    
+    // 清空现有选项（保留默认选项）
+    const defaultOption = selectEl.querySelector('option[value="default"]');
+    selectEl.innerHTML = '';
+    selectEl.appendChild(defaultOption);
+    
+    // 创建一个集合来跟踪已添加的选项值
+    const addedOptions = new Set(['default']);
+    
+    // 添加预定义的单词库文件选项
+    predefinedWordFiles.forEach(file => {
+      // 检查文件是否已加载过
+      if (!wordFiles[file.id]) {
+        wordFiles[file.id] = {
+          name: file.name,
+          filename: file.filename,
+          words: [],
+          isCustom: true,
+          loaded: false
+        };
+      }
+      
+      // 只添加不存在的选项
+      if (!addedOptions.has(file.id)) {
+        const option = document.createElement("option");
+        option.value = file.id;
+        option.textContent = file.name;
+        selectEl.appendChild(option);
+        addedOptions.add(file.id);
+      }
+    });
+    
+    // 从本地存储加载自定义文件进度
+    const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
+    Object.keys(savedFiles).forEach(key => {
+      if (!wordFiles[key]) {
+        wordFiles[key] = savedFiles[key];
+      }
+      
+      // 只添加不存在的选项
+      if (!addedOptions.has(key)) {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = wordFiles[key].name;
+        selectEl.appendChild(option);
+        addedOptions.add(key);
+      }
+    });
+    
+    // 恢复当前选中的文件
+    selectEl.value = currentFile;
+    
+    // 更新删除按钮状态
+    updateDeleteButton();
+  }
 
   // 更新删除按钮状态
   function updateDeleteButton() {
