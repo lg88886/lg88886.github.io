@@ -1,10 +1,10 @@
 morning,早晨；上午,/ˈmɔːnɪŋ/
-afternoon,午后；下午,[ˌɑːftəˈnuːn/
+afternoon,午后；下午,/ˌɑːftəˈnuːn/
 evening,晚上；傍晚,/ˈiːvnɪŋ/
 night,夜间；夜晚,/naɪt/
 fine,好的,/faɪn/
 thank,感谢,/θæŋk/
-goodbye,再见,[ˌɡʊdˈbaɪ/
+goodbye,再见,/ˌɡʊdˈbaɪ/
 woof,狗叫声,/wʊf/
 Mrs,夫人；太太,/ˈmɪsɪz/
 day,一天,/deɪ/
