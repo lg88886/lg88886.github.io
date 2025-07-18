@@ -126,13 +126,14 @@
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
   
-  <!-- 文件选择区域 -->
+  <!-- 新增：文件选择区域 -->
   <div id="fileSelector" style="margin-bottom: 15px;">
     <label>选择单词文件：</label>
     <select id="wordFileSelect" onchange="loadSelectedWordFile()">
-      <!-- 选项将动态添加 -->
+      <option value="default">默认单词库</option>
+      <!-- 其他文件选项将动态添加 -->
     </select>
     <button onclick="deleteCurrentFile()" id="deleteFileBtn" style="background-color: #f44336;">删除文件进度</button>
     <div id="fileNotification" class="file-notification"></div>
@@ -157,15 +158,240 @@
   </div>
 </div>
 <script>
-  // 预定义的单词库文件
+  // 原始单词列表
+  const defaultWordList = [
+    {word:"morning", definition:"早晨；上午"},
+    {word:"afternoon", definition:"午后；下午"},
+    {word:"evening", definition:"晚上；傍晚"},
+    {word:"night", definition:"夜间；夜晚"},
+    {word:"fine", definition:"好的"},
+    {word:"thank", definition:"感谢"},
+    {word:"goodbye", definition:"再见"},
+    {word:"woof", definition:"狗叫声"},
+    {word:"Mrs", definition:"夫人；太太"},
+    {word:"day", definition:"一天"},
+    {word:"today", definition:"今天"},
+    {word:"very", definition:"很；非常"},
+    {word:"well", definition:"健康的；身体好的"},
+    {word:"hope", definition:"希望"},
+    {word:"too", definition:"太；也"},
+    {word:"apple", definition:"苹果"},
+    {word:"bag", definition:"包"},
+    {word:"boy", definition:"男孩"},
+    {word:"girl", definition:"女孩"},
+    {word:"big", definition:"大的"},
+    {word:"small", definition:"小的"},
+    {word:"short", definition:"矮的；短的"},
+    {word:"thin", definition:"瘦的；薄的"},
+    {word:"Miss", definition:"女士；小姐"},
+    {word:"cat", definition:"猫"},
+    {word:"dog", definition:"狗"},
+    {word:"seven", definition:"七"},
+    {word:"eight", definition:"八"},
+    {word:"nine", definition:"九"},
+    {word:"ten", definition:"十"},
+    {word:"touch", definition:"触摸"},
+    {word:"knee", definition:"膝盖"},
+    {word:"pick up", definition:"捡起；拾起"},
+    {word:"stick", definition:"枯枝；木棍"},
+    {word:"draw", definition:"画；绘画"},
+    {word:"snake", definition:"蛇"},
+    {word:"again", definition:"再一次"},
+    {word:"sorry", definition:"抱歉的；对不起"},
+    {word:"elephant", definition:"大象"},
+    {word:"five", definition:"五"},
+    {word:"run", definition:"跑"},
+    {word:"write", definition:"写"},
+    {word:"swim", definition:"游泳"},
+    {word:"fly", definition:"飞"},
+    {word:"sing", definition:"唱（歌）"},
+    {word:"skip", definition:"跳绳"},
+    {word:"ride", definition:"骑（马；车）"},
+    {word:"bicycle", definition:"单车，自行车"},
+    {word:"supergirl", definition:"超级女孩"},
+    {word:"but", definition:"但是"},
+    {word:"hand", definition:"手"},
+    {word:"gate", definition:"大门"},
+    {word:"plate", definition:"盘子"},
+    {word:"young", definition:"年轻的"},
+    {word:"old", definition:"老的；旧的"},
+    {word:"family", definition:"家庭"},
+    {word:"friend", definition:"朋友"},
+    {word:"who", definition:"谁"},
+    {word:"brother", definition:"兄弟"},
+    {word:"sister", definition:"姐妹"},
+    {word:"grandmother", definition:"祖母；奶奶；外婆"},
+    {word:"mummy", definition:"（口语）妈妈"},
+    {word:"daddy", definition:"（口语）爸爸"},
+    {word:"kind and dear", definition:"和蔼可亲的"},
+    {word:"nice", definition:"美好的"},
+    {word:"sweet", definition:"甜的"},
+    {word:"insect", definition:"昆虫"},
+    {word:"jar", definition:"玻璃罐"},
+    {word:"hair", definition:"头发"},
+    {word:"head", definition:"头"},
+    {word:"face", definition:"脸"},
+    {word:"mouth", definition:"嘴"},
+    {word:"eye", definition:"眼睛"},
+    {word:"my", definition:"我的"},
+    {word:"your", definition:"你的"},
+    {word:"giant", definition:"巨人"},
+    {word:"like", definition:"喜欢"},
+    {word:"long", definition:"长的"},
+    {word:"kite", definition:"风筝"},
+    {word:"lion", definition:"狮子"},
+    {word:"look", definition:"看；看起来"},
+    {word:"slide", definition:"滑梯"},
+    {word:"swing", definition:"秋千"},
+    {word:"seesaw", definition:"跷跷板"},
+    {word:"bee", definition:"蜜蜂"},
+    {word:"yellow", definition:"黄色（的）"},
+    {word:"up", definition:"向上"},
+    {word:"down", definition:"向下"},
+    {word:"play", definition:"（尤指儿童）玩；玩耍"},
+    {word:"see", definition:"看见"},
+    {word:"they", definition:"他（她；它）们"},
+    {word:"mouse", definition:"老鼠"},
+    {word:"net", definition:"网"},
+    {word:"man", definition:"男人"},
+    {word:"bag", definition:"包"},
+    {word:"box", definition:"箱子；盒子"},
+    {word:"desk", definition:"书桌"},
+    {word:"chair", definition:"椅子"},
+    {word:"book", definition:"书"},
+    {word:"pencil", definition:"铅笔"},
+    {word:"pencil case", definition:"铅笔盒"},
+    {word:"car", definition:"汽车"},
+    {word:"bear", definition:"熊"},
+    {word:"put", definition:"放"},
+    {word:"in", definition:"在……里面"},
+    {word:"on", definition:"在……上面"},
+    {word:"room", definition:"房间"},
+    {word:"love", definition:"喜爱"},
+    {word:"like", definition:"像；如同；喜欢"},
+    {word:"use", definition:"使用"},
+    {word:"every", definition:"每个；每一"},
+    {word:"keep", definition:"保持"},
+    {word:"clean", definition:"清洁"},
+    {word:"orange", definition:"橙色；橙子"},
+    {word:"pig", definition:"猪"},
+    {word:"has", definition:"有（have 三单形式）"},
+    {word:"for", definition:"给；为了"},
+    {word:"her", definition:"她的；她"},
+    {word:"with", definition:"和……一起"},
+    {word:"leg", definition:"腿"},
+    {word:"come", definition:"来；来到"},
+    {word:"eat", definition:"吃"},
+    {word:"bowl", definition:"碗"},
+    {word:"plate", definition:"盘子"},
+    {word:"spoon", definition:"勺子"},
+    {word:"chopsticks", definition:"筷子"},
+    {word:"cook", definition:"做饭"},
+    {word:"dinner", definition:"晚餐"},
+    {word:"thanks", definition:"谢谢"},
+    {word:"give", definition:"给"},
+    {word:"ready", definition:"准备好（做某事）的"},
+    {word:"here", definition:"在这里；此时"},
+    {word:"How many", definition:"多少"},
+    {word:"kitchen", definition:"厨房"},
+    {word:"naughty", definition:"顽皮的"},
+    {word:"jump", definition:"跳"},
+    {word:"floor", definition:"地板"},
+    {word:"under", definition:"在……下面"},
+    {word:"queen", definition:"女王；王后"},
+    {word:"rabbit", definition:"兔子"},
+    {word:"sit", definition:"坐"},
+    {word:"sun", definition:"太阳"},
+    {word:"moon", definition:"月亮"},
+    {word:"star", definition:"星星"},
+    {word:"sky", definition:"天空"},
+    {word:"bright", definition:"明亮的"},
+    {word:"twinkle", definition:"闪烁；闪耀"},
+    {word:"wonder", definition:"想知道"},
+    {word:"above", definition:"在……上面"},
+    {word:"world", definition:"世界"},
+    {word:"high", definition:"高的"},
+    {word:"diamond", definition:"钻石"},
+    {word:"soup", definition:"汤"},
+    {word:"soft", definition:"柔软的"},
+    {word:"smooth", definition:"光滑的"},
+    {word:"eat", definition:"吃"},
+    {word:"fox", definition:"狐狸"},
+    {word:"hippo", definition:"河马"},
+    {word:"meat", definition:"肉"},
+    {word:"grass", definition:"草；草地"},
+    {word:"wild", definition:"野生的"},
+    {word:"animal", definition:"动物"},
+    {word:"lion", definition:"狮子"},
+    {word:"monkey", definition:"猴子"},
+    {word:"banana", definition:"香蕉"},
+    {word:"run", definition:"跑"},
+    {word:"cute", definition:"可爱的"},
+    {word:"white", definition:"白色（的）"},
+    {word:"hop", definition:"单脚跳"},
+    {word:"naughty", definition:"顽皮的"},
+    {word:"brown", definition:"棕色（的）"},
+    {word:"swing", definition:"秋千"},
+    {word:"umbrella", definition:"雨伞"},
+    {word:"van", definition:"（厢式）小型货车"},
+    {word:"take", definition:"拿；取走"},
+    {word:"raindrop", definition:"雨滴"},
+    {word:"fall", definition:"掉落"},
+    {word:"close", definition:"关闭"},
+    {word:"window", definition:"窗户"},
+    {word:"flower", definition:"花"},
+    {word:"tree", definition:"树"},
+    {word:"pick", definition:"采；摘（花、果）"},
+    {word:"climb", definition:"攀爬"},
+    {word:"colour", definition:"颜色；涂颜色"},
+    {word:"cut", definition:"切；割；剪"},
+    {word:"beautiful", definition:"美丽的"},
+    {word:"help", definition:"帮助"},
+    {word:"cry", definition:"哭；哭泣"},
+    {word:"zebra", definition:"斑马"},
+    {word:"zoo", definition:"动物园"},
+    {word:"white", definition:"白色（的）"},
+    {word:"purple", definition:"紫色（的）"},
+    {word:"pink", definition:"粉红色（的）"},
+    {word:"orange", definition:"橙色（的）"},
+    {word:"brown", definition:"棕色（的）"},
+    {word:"black", definition:"黑色（的）"},
+    {word:"green", definition:"绿色（的）"},
+    {word:"yellow", definition:"黄色（的）"},
+    {word:"blue", definition:"蓝色（的）"},
+    {word:"red", definition:"红色（的）"},
+    {word:"rainbow", definition:"彩虹"},
+    {word:"shine", definition:"发光；照耀"},
+    {word:"outside", definition:"在外面"},
+    {word:"window", definition:"窗户"},
+    {word:"pear", definition:"梨"},
+    {word:"rabbit", definition:"兔子"},
+    {word:"apple", definition:"苹果"},
+    {word:"bird", definition:"鸟"},
+    {word:"butterfly", definition:"蝴蝶"},
+    {word:"watch", definition:"观看；注视"},
+    {word:"go out", definition:"出去"},
+    {word:"house", definition:"房屋"},
+    {word:"want", definition:"想要"},
+    {word:"some", definition:"有些；一些"},
+    {word:"sleep", definition:"睡觉"},
+    {word:"little", definition:"一点儿；少量的"}
+  ];
+
+  const puzzleQuestions = [
+    { question: "“日出大米”猜一个字？", options: ["明", "昌", "早", "亮"], answer: "昌" },
+  ];
+
+  // 多文件支持 - 预定义的单词库文件名
   const predefinedWordFiles = [
-    {id: "elementary", name: "二年级单词", filename: "elementary_words.txt"},
-    {id: "newconcept1", name: "新概念1词库", filename: "newconcept1_words.txt"}
+    {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
   ];
 
   // 单词文件存储
-  let wordFiles = {};
-  let currentFile = null;
+  let wordFiles = {
+    "default": { name: "默认单词库", words: defaultWordList, isCustom: false }
+  };
+  let currentFile = "default";
 
   // 游戏变量 - 从本地存储加载或初始化
   let gameData = JSON.parse(localStorage.getItem('wordGameData')) || {
@@ -190,13 +416,6 @@
   let levelCorrect = 0;
   let recognition; // 语音识别对象
 
-  // 谜题
-  const puzzleQuestions = [
-    { question: "“日出大米”猜一个字？", options: ["明", "昌", "早", "亮"], answer: "昌" },
-    { question: "“一加一不是二”猜一个字？", options: ["王", "丰", "田", "由"], answer: "王" },
-    { question: "“人在云上”猜一个字？", options: ["会", "云", "合", "今"], answer: "会" }
-  ];
-
   // 标记已使用的谜题
   puzzleQuestions.forEach(q => {
     if (gameData.puzzleQuestionsUsed.includes(puzzleQuestions.indexOf(q))) {
@@ -219,100 +438,81 @@
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
 
-  // 初始化文件选择器
-  function initFileSelector() {
-    const selectEl = document.getElementById("wordFileSelect");
-    const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
-    
-    // 清空现有选项
-    selectEl.innerHTML = '';
-    
-    // 创建一个集合来跟踪已添加的选项值
-    const addedOptions = new Set();
-    
-    // 添加预定义的单词库文件选项
-    predefinedWordFiles.forEach(file => {
-      // 初始化文件信息
-      if (!wordFiles[file.id]) {
-        wordFiles[file.id] = {
-          name: file.name,
-          filename: file.filename,
-          words: [],
-          isCustom: false,
-          loaded: false
-        };
-      }
-      
-      // 添加选项
-      if (!addedOptions.has(file.id)) {
-        const option = document.createElement("option");
-        option.value = file.id;
-        option.textContent = file.name;
-        selectEl.appendChild(option);
-        addedOptions.add(file.id);
-      }
-    });
-    
-    // 从本地存储加载自定义文件
-    const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
-    Object.keys(savedFiles).forEach(key => {
-      if (!wordFiles[key]) {
-        wordFiles[key] = savedFiles[key];
-      }
-      
-      // 添加选项
-      if (!addedOptions.has(key)) {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = wordFiles[key].name;
-        selectEl.appendChild(option);
-        addedOptions.add(key);
-      }
-    });
-    
-    // 尝试恢复上次选择的文件
-    const lastSelectedFile = localStorage.getItem('lastSelectedWordFile');
-    if (lastSelectedFile && wordFiles[lastSelectedFile]) {
-      currentFile = lastSelectedFile;
-      selectEl.value = currentFile;
-    } else if (predefinedWordFiles.length > 0) {
-      // 默认选择第一个预定义文件
-      currentFile = predefinedWordFiles[0].id;
-      selectEl.value = currentFile;
-    }
-    
-    // 更新删除按钮状态
-    updateDeleteButton();
-    
-    // 如果有当前文件，加载它
-    if (currentFile) {
-      loadSelectedWordFile();
-    }
-  }
+	// 初始化文件选择器 - 修复重复添加选项的问题
+	function initFileSelector() {
+	  const selectEl = document.getElementById("wordFileSelect");
+	  const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+	  
+	  // 清空现有选项（保留默认选项）
+	  const defaultOption = selectEl.querySelector('option[value="default"]');
+	  selectEl.innerHTML = '';
+	  selectEl.appendChild(defaultOption);
+	  
+	  // 创建一个集合来跟踪已添加的选项值
+	  const addedOptions = new Set(['default']);
+	  
+	  // 添加预定义的单词库文件选项
+	  predefinedWordFiles.forEach(file => {
+		// 检查文件是否已加载过
+		if (!wordFiles[file.id]) {
+		  wordFiles[file.id] = {
+			name: file.name,
+			filename: file.filename,
+			words: [],
+			isCustom: true,
+			loaded: false
+		  };
+		}
+		
+		// 只添加不存在的选项
+		if (!addedOptions.has(file.id)) {
+		  const option = document.createElement("option");
+		  option.value = file.id;
+		  option.textContent = file.name;
+		  selectEl.appendChild(option);
+		  addedOptions.add(file.id);
+		}
+	  });
+	  
+	  // 从本地存储加载自定义文件进度
+	  const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
+	  Object.keys(savedFiles).forEach(key => {
+		if (!wordFiles[key]) {
+		  wordFiles[key] = savedFiles[key];
+		}
+		
+		// 只添加不存在的选项
+		if (!addedOptions.has(key)) {
+		  const option = document.createElement("option");
+		  option.value = key;
+		  option.textContent = wordFiles[key].name;
+		  selectEl.appendChild(option);
+		  addedOptions.add(key);
+		}
+	  });
+	  
+	  // 恢复当前选中的文件
+	  selectEl.value = currentFile;
+	  
+	  // 更新删除按钮状态
+	  updateDeleteButton();
+	}
 
   // 更新删除按钮状态
   function updateDeleteButton() {
-    if (currentFile && wordFiles[currentFile]) {
-      deleteFileBtn.disabled = false;
-      deleteFileBtn.style.display = "inline-block";
-    } else {
-      deleteFileBtn.disabled = true;
-      deleteFileBtn.style.display = "none";
-    }
+    deleteFileBtn.disabled = currentFile === "default";
+    deleteFileBtn.style.display = currentFile === "default" ? "none" : "inline-block";
   }
 
   // 加载选中的单词文件
   function loadSelectedWordFile() {
     const selectedFile = document.getElementById("wordFileSelect").value;
-    if (selectedFile && wordFiles[selectedFile] && selectedFile !== currentFile) {
+    if (selectedFile && wordFiles[selectedFile] && selectedFile !== currentFile) { // 只有选中不同文件时才执行
       // 保存当前文件的进度
-      if (currentFile) {
-        saveCurrentFileProgress();
-      }
+      saveCurrentFileProgress();
       
       // 切换到选中文件
       currentFile = selectedFile;
-      localStorage.setItem('lastSelectedWordFile', currentFile);
       fileNotification.textContent = "";
       
       // 检查文件是否需要加载
@@ -372,7 +572,7 @@
               name: file.name,
               filename: file.filename,
               words: words,
-              isCustom: file.isCustom || false,
+              isCustom: true,
               loaded: true
             };
             localStorage.setItem('customWordFiles', JSON.stringify(savedFiles));
@@ -381,8 +581,13 @@
             
             // 加载文件进度
             loadFileProgress();
+            // 保持当前单词索引不变
+            currentIndex = currentIndex; 
+            isReviewMode = false;
             
-            // 加载下一个单词
+            // 更新删除按钮状态
+            updateDeleteButton();
+            
             loadNext();
           } else {
             fileNotification.textContent = `错误：${file.name} 格式不正确，请确保每行包含一个单词和释义，用逗号分隔。`;
@@ -407,8 +612,6 @@
 
   // 保存当前文件的进度
   function saveCurrentFileProgress() {
-    if (!currentFile) return;
-    
     const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
     progressData[currentFile] = {
       currentIndex,
@@ -423,15 +626,13 @@
     localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
   }
 
-  // 加载文件的进度
+  // 加载文件的进度 - 核心修改：保存并恢复当前单词索引
   function loadFileProgress() {
-    if (!currentFile) return;
-    
     const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
     const fileProgress = progressData[currentFile] || {};
     
     // 应用文件特定的进度数据
-    currentIndex = fileProgress.currentIndex || 0;
+    currentIndex = fileProgress.currentIndex || 0;  // 关键：恢复当前单词索引
     level = fileProgress.level || 0;
     correctCount = fileProgress.correctCount || 0;
     wrongList = fileProgress.wrongList || [];
@@ -449,22 +650,25 @@
     saveCurrentFileProgress();
   });
 
-  // 删除当前文件的进度数据
+  // 删除当前文件的进度数据（而非文件本身）
   function deleteCurrentFile() {
-    if (!currentFile || !confirm(`确定要删除"${wordFiles[currentFile].name}"的进度数据吗？`)) {
+    if (currentFile === "default") {
+      alert("默认单词库不能删除");
       return;
     }
     
-    // 删除进度数据
-    const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
-    delete progressData[currentFile];
-    localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
-    
-    // 重新加载进度
-    loadFileProgress();
-    isReviewMode = false;
-    
-    loadNext();
+    if (confirm(`确定要删除"${wordFiles[currentFile].name}"的进度数据吗？`)) {
+      // 删除进度数据
+      const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+      delete progressData[currentFile];
+      localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
+      
+      // 重新加载进度
+      loadFileProgress();
+      isReviewMode = false;
+      
+      loadNext();
+    }
   }
 
   // 保存游戏进度到本地存储
@@ -479,33 +683,25 @@
       .map((q, i) => q.used ? i : null)
       .filter(i => i !== null);
     
-    localStorage.setItem('wordGameData', JSON.stringify(gameData));
-    
     // 保存到当前文件的进度中
     saveCurrentFileProgress();
   }
 
   // 重置游戏进度
   function resetProgress() {
-    if (!currentFile || !confirm(`确定要重置"${wordFiles[currentFile].name}"的所有进度吗？`)) {
-      return;
+    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
+      currentIndex = 0;  // 重置为第一个单词
+      level = 0;
+      correctCount = 0;
+      wrongList = [];
+      levelStars = [];
+      puzzleQuestions.forEach(q => q.used = false);
+      saveProgress();
+      loadNext();
     }
-    
-    currentIndex = 0;
-    level = 0;
-    correctCount = 0;
-    wrongList = [];
-    levelStars = [];
-    puzzleQuestions.forEach(q => q.used = false);
-    levelCorrect = 0;
-    
-    saveProgress();
-    loadNext();
   }
 
   function updateStats() {
-    if (!currentFile) return;
-    
     const currentWords = wordFiles[currentFile].words;
     statsEl.textContent = `正确：${correctCount}  错误：${wrongList.length}  进度：${currentIndex + 1} / ${currentWords.length}`;
   }
@@ -514,33 +710,23 @@
     resultEl.textContent = "";
     optionsEl.innerHTML = "";
     letterBox.innerHTML = "";
-    
-    // 如果没有当前文件，显示提示
-    if (!currentFile || !wordFiles[currentFile] || !wordFiles[currentFile].loaded) {
-      instructionEl.textContent = "请从上方选择一个单词文件开始游戏";
-      definitionEl.textContent = "";
-      questionEl.textContent = "";
-      statsEl.textContent = "";
-      nextBtn.disabled = true;
-      return;
-    }
-    
     updateStats();
+    startReadingBtn.style.display = "none";
     
     // 获取当前单词列表
     const currentWords = wordFiles[currentFile].words;
     
-    // 控制“跳过此题”按钮的状态
+    // 控制“跳过此题”按钮的显示和启用状态
     if (isReviewMode || inPuzzle || currentIndex < currentWords.length) {
+      nextBtn.style.display = "inline-block";
       nextBtn.disabled = false;
     } else {
-      nextBtn.disabled = true;
+      nextBtn.style.display = "none";
     }
 
     // 错题回顾模式
     if (isReviewMode) {
       document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
-      
       // 空错题本的提示
       if (wrongList.length === 0) {
         instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
@@ -548,12 +734,10 @@
         questionEl.textContent = "";
         return;
       }
-      
       // 确保索引在有效范围内
       if (currentReviewIndex >= wrongList.length) {
         currentReviewIndex = 0;
       }
-      
       const wordObj = wrongList[currentReviewIndex];
       instructionEl.textContent = `错题回顾 第 ${currentReviewIndex + 1}/${wrongList.length} 题`;
       definitionEl.textContent = `中文提示：${wordObj.definition}`;
@@ -577,7 +761,6 @@
         addInputListeners(input);
         letterBox.appendChild(input);
       }
-      
       letterBox.querySelector("input.letter-input")?.focus();
       
       // 自动播放当前单词读音
@@ -587,13 +770,11 @@
 
     // 正常闯关模式
     document.querySelector('button[onclick="exitReview()"]').style.display = "none";
-    
     const start = level * 8;
     if (currentIndex - start >= 8) {
       showPuzzle();
       return;
     }
-    
     if (currentIndex >= currentWords.length) {
       instructionEl.textContent = "🎉 恭喜你完成所有单词！";
       definitionEl.innerHTML = `总星级：${levelStars.reduce((a, b) => a + b, 0)}/${levelStars.length * 3} ⭐`;
@@ -624,7 +805,6 @@
       addInputListeners(input);
       letterBox.appendChild(input);
     }
-    
     letterBox.querySelector("input.letter-input")?.focus();
     
     // 自动播放当前单词读音
@@ -643,14 +823,14 @@
   // 跳过当前题目
   function submitAnswer() {
     if (isReviewMode) {
-      // 复习模式：跳转到下一个错题
+      // 复习模式：直接跳转到下一个错题
       currentReviewIndex++;
       loadNext();
       return;
     }
     
     if (inPuzzle) {
-      // 谜题模式：进入下一关
+      // 谜题模式：直接进入下一关
       level++;
       levelCorrect = 0;
       currentIndex = level * 8;
@@ -663,7 +843,6 @@
     // 正常闯关模式：记录错题并跳转
     const currentWords = wordFiles[currentFile].words;
     const currentWord = currentWords[currentIndex];
-    
     // 避免重复添加同一错题
     const isAlreadyInWrong = wrongList.some(item => item.word === currentWord.word);
     if (!isAlreadyInWrong) {
@@ -694,48 +873,15 @@
       resultEl.textContent = "✅ 拼写正确！请点击开始朗读";
       correctSound.play();
       startReadingBtn.style.display = "inline-block";
-      
-      // 添加正确动画
-      inputs.forEach(input => {
-        input.classList.add("correct");
-      });
     } else {
       resultEl.textContent = "❌ 拼写错误，请重新填写";
       wrongSound.play();
-      
       // 清空输入框
       inputs.forEach(input => {
         input.value = "";
-        input.classList.remove("correct");
       });
-      
       letterBox.querySelector("input.letter-input")?.focus();
     }
-  }
-
-  // 添加输入框事件监听
-  function addInputListeners(input) {
-    input.addEventListener("input", function() {
-      this.value = this.value.toLowerCase();
-      autoCheckAnswer();
-      
-      // 自动跳到下一个输入框
-      if (this.value && this.nextElementSibling && this.nextElementSibling.classList.contains('letter-input')) {
-        this.nextElementSibling.focus();
-      }
-    });
-    
-    input.addEventListener("keydown", function(e) {
-      // 处理退格键
-      if (e.key === "Backspace" && !this.value) {
-        if (this.previousElementSibling && this.previousElementSibling.classList.contains('letter-input')) {
-          this.previousElementSibling.focus();
-        } else if (this.previousElementSibling && this.previousElementSibling.classList.contains('fixed-letter')) {
-          // 不能删除固定的首字母
-          e.preventDefault();
-        }
-      }
-    });
   }
 
   // 初始化语音识别
@@ -780,12 +926,11 @@
       resultEl.textContent = "✅ 朗读正确！正在进入下一题...";
       correctSound.play();
       
-      // 延迟进入下一题
+      // 延迟一段时间后自动进入下一题
       setTimeout(() => {
         if (isReviewMode) {
           // 复习模式：从错题本中删除当前做对的题目
           wrongList.splice(currentReviewIndex, 1);
-          
           // 如果删除后错题本为空，显示提示
           if (wrongList.length === 0) {
             instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
@@ -796,19 +941,13 @@
             startReadingBtn.style.display = "none";
             return;
           }
-          
+          // 保持索引不变（因为数组长度减少了1）
           loadNext();
         } else {
           correctCount++;
           currentStreak++;
           levelCorrect++;
           currentIndex++;
-          
-          // 显示连击效果
-          if (currentStreak >= 3) {
-            showStreakEffect(`🔥 连击 ${currentStreak}！`);
-          }
-          
           saveProgress();
           loadNext();
         }
@@ -817,19 +956,6 @@
       resultEl.textContent = `❌ 朗读不正确（你读的是: "${transcript}"），请再试一次`;
       wrongSound.play();
     }
-  }
-
-  // 显示连击效果
-  function showStreakEffect(text) {
-    const streakEl = document.createElement("div");
-    streakEl.className = "streak-effect";
-    streakEl.textContent = text;
-    document.body.appendChild(streakEl);
-    
-    // 动画结束后移除元素
-    setTimeout(() => {
-      streakEl.remove();
-    }, 1000);
   }
 
   // 开始监听语音输入
@@ -849,27 +975,22 @@
     }
   }
 
-  // 朗读单词
   function readWord() {
-    if (!currentFile || !wordFiles[currentFile].loaded) return;
-    
     const currentWords = wordFiles[currentFile].words;
-    const wordObj = isReviewMode 
-      ? wrongList[currentReviewIndex] 
-      : currentWords[currentIndex];
-    
-    if (!wordObj) return;
+    const word = isReviewMode 
+      ? wrongList[currentReviewIndex]?.word 
+      : currentWords[currentIndex]?.word;
+      
+    if (!word) return;
     
     // 停止任何正在播放的语音
     window.speechSynthesis.cancel();
-    
-    const utter = new SpeechSynthesisUtterance(wordObj.word);
+    const utter = new SpeechSynthesisUtterance(word);
     utter.lang = "en-US";
     utter.rate = 0.9;
     window.speechSynthesis.speak(utter);
   }
 
-  // 显示关卡谜题
   function showPuzzle() {
     inPuzzle = true;
     letterBox.innerHTML = "";
@@ -877,6 +998,7 @@
     definitionEl.textContent = "";
     resultEl.textContent = "";
     startReadingBtn.style.display = "none";
+    nextBtn.style.display = "none";
 
     // 计算当前关卡星级
     const rate = levelCorrect / 8;
@@ -891,10 +1013,8 @@
       loadNext();
       return;
     }
-    
     const puzzle = unused[Math.floor(Math.random() * unused.length)];
     puzzle.used = true;
-    
     questionEl.textContent = `🎯 关卡挑战：${puzzle.question}`;
     definitionEl.innerHTML = `本关评分：${"⭐".repeat(stars)}`;
 
@@ -906,12 +1026,10 @@
         if (opt === puzzle.answer) {
           resultEl.textContent = "🎉 答对了，进入下一关！";
           correctSound.play();
-          
           level++;
           levelCorrect = 0;
           currentIndex = level * 8;
           saveProgress();
-          
           setTimeout(() => {
             inPuzzle = false;
             loadNext();
@@ -925,26 +1043,65 @@
     });
   }
 
-  // 查看错题本
   function showMistakes() {
     if (wrongList.length === 0) {
       alert("目前没有错题！");
       return;
     }
-    
     isReviewMode = true;
     currentReviewIndex = 0;
     loadNext();
   }
 
-  // 退出复习模式
   function exitReview() {
     isReviewMode = false;
     loadNext();
   }
 
-  // 初始化游戏
+  let isComposing = false;  // 处理中文输入
+  function handleInput(e) {
+    if (isComposing) return;
+    const input = e.target;
+    input.value = input.value.slice(0, 1).toLowerCase(); // 限制为小写字母
+    input.classList.add("correct");
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT') next.focus();
+    
+    // 检查是否所有输入框都已填满，如果是则自动检查答案
+    autoCheckAnswer();
+  }
+
+  function handleBackspace(e) {
+    if (e.key === "Backspace") {
+      if (e.target.value) {
+        e.target.value = "";
+        e.preventDefault();
+      } else {
+        const prev = e.target.previousElementSibling;
+        if (prev && prev.tagName === 'INPUT') {
+          prev.focus();
+          e.preventDefault();
+        }
+      }
+    }
+  }
+
+  function addInputListeners(input) {
+    input.addEventListener("input", handleInput);
+    input.addEventListener("keydown", handleBackspace);
+    input.addEventListener("compositionstart", () => isComposing = true);
+    input.addEventListener("compositionend", (e) => {
+      isComposing = false;
+      handleInput(e);
+    });
+  }
+
+  // 初始化游戏和语音识别
   initFileSelector();
+  loadFileProgress();
+  initRecognition();
+  loadNext();
 </script>
 </body>
 </html>
+  
