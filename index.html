@@ -152,7 +152,7 @@
     <div class="letter-box" id="letterBox"></div>
     <div>
       <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
-      <button onclick="submitAnswer()" id="nextBtn" disabled>跳过此题</button>
+      <button onclick="submitAnswer()" id="nextBtn">跳过此题</button>
       <button onclick="readWord()">🔊 听单词</button>
       <button onclick="resetProgress()" class="reset-btn">重置进度</button>
       <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
@@ -270,8 +270,7 @@
 
   // 多文件支持 - 预定义的单词库文件名
   const predefinedWordFiles = [
-          {id: "two", name: "二年级单词", filename: "two_words.txt"},
-	  {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
+    {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
   ];
 
   // 单词文件存储
@@ -602,6 +601,11 @@
     updateStats();
     startReadingBtn.style.display = "none";
     
+    // 确保跳过按钮始终显示
+    nextBtn.style.display = "inline-block";
+    nextBtn.disabled = false;
+    nextBtn.textContent = isReviewMode ? "下一个错题" : "跳过此题";
+    
     // 错题回顾模式
     if (isReviewMode) {
       document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
@@ -611,6 +615,7 @@
         definitionEl.textContent = "继续加油哦！";
         phoneticEl.textContent = "";
         questionEl.textContent = "";
+        nextBtn.style.display = "none";
         return;
       }
       // 确保索引在有效范围内
@@ -660,6 +665,7 @@
       definitionEl.innerHTML = `总星级：${levelStars.reduce((a, b) => a + b, 0)}/${levelStars.length * 3} ⭐`;
       phoneticEl.textContent = "";
       questionEl.textContent = "";
+      nextBtn.style.display = "none";
       return;
     }
 
@@ -909,7 +915,10 @@
     phoneticEl.textContent = "";
     resultEl.textContent = "";
     startReadingBtn.style.display = "none";
-    nextBtn.style.display = "none";
+    
+    // 确保跳过按钮显示并修改文本
+    nextBtn.style.display = "inline-block";
+    nextBtn.textContent = "进入下一关";
 
     // 计算当前关卡星级
     const rate = levelCorrect / 8;
