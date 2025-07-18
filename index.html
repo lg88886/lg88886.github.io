@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>单词拼写闯关游戏</title>
   <style>
+    /* 保持原有样式不变 */
     body {
       font-family: Arial, sans-serif;
       background: #f0f8ff;
@@ -108,6 +109,15 @@
       font-size: 14px;
       margin: 10px 0;
     }
+    .listening {
+      background-color: #f44336;
+    }
+    .reset-btn {
+      background-color: #2196F3;
+    }
+    .review-btn {
+      background-color: #9C27B0;
+    }
   </style>
 </head>
 <body>
@@ -116,8 +126,8 @@
   <audio id="bgm" autoplay loop>
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
-  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"> ></audio>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_371f292d82.mp3"> ></audio>
+  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
   
   <!-- 新增：文件选择区域 -->
   <div id="fileSelector" style="margin-bottom: 15px;">
@@ -403,6 +413,8 @@
   // 多文件支持 - 预定义的单词库文件名
   const predefinedWordFiles = [
     {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
+    {id: "intermediate", name: "中级单词库", filename: "intermediate_words.txt"},
+    {id: "advanced", name: "高级单词库", filename: "advanced_words.txt"},
   ];
 
   // 单词文件存储
@@ -456,10 +468,15 @@
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
 
-  // 初始化文件选择器
+  // 初始化文件选择器 - 修复重复添加选项的问题
   function initFileSelector() {
     const selectEl = document.getElementById("wordFileSelect");
     const fileProgress = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
+    
+    // 清空现有选项（保留默认选项）
+    const defaultOption = selectEl.querySelector('option[value="default"]');
+    selectEl.innerHTML = '';
+    selectEl.appendChild(defaultOption);
     
     // 添加预定义的单词库文件选项
     predefinedWordFiles.forEach(file => {
@@ -474,11 +491,14 @@
         };
       }
       
-      // 添加到选择器
-      const option = document.createElement("option");
-      option.value = file.id;
-      option.textContent = file.name;
-      selectEl.appendChild(option);
+      // 检查选项是否已存在，避免重复添加
+      const optionExists = Array.from(selectEl.options).some(option => option.value === file.id);
+      if (!optionExists) {
+        const option = document.createElement("option");
+        option.value = file.id;
+        option.textContent = file.name;
+        selectEl.appendChild(option);
+      }
     });
     
     // 从本地存储加载自定义文件进度
@@ -486,13 +506,20 @@
     Object.keys(savedFiles).forEach(key => {
       if (!wordFiles[key]) {
         wordFiles[key] = savedFiles[key];
-        
+      }
+      
+      // 检查选项是否已存在，避免重复添加
+      const optionExists = Array.from(selectEl.options).some(option => option.value === key);
+      if (!optionExists) {
         const option = document.createElement("option");
         option.value = key;
         option.textContent = wordFiles[key].name;
         selectEl.appendChild(option);
       }
     });
+    
+    // 恢复当前选中的文件
+    selectEl.value = currentFile;
     
     // 更新删除按钮状态
     updateDeleteButton();
@@ -507,7 +534,7 @@
   // 加载选中的单词文件
   function loadSelectedWordFile() {
     const selectedFile = document.getElementById("wordFileSelect").value;
-    if (selectedFile && wordFiles[selectedFile]) {
+    if (selectedFile && wordFiles[selectedFile] && selectedFile !== currentFile) { // 只有选中不同文件时才执行
       // 保存当前文件的进度
       saveCurrentFileProgress();
       
@@ -524,7 +551,6 @@
       
       // 加载文件进度
       loadFileProgress();
-      currentIndex = currentIndex; // 保持当前单词索引
       isReviewMode = false;
       
       // 更新删除按钮状态
@@ -602,6 +628,10 @@
       } else {
         fileNotification.textContent = `错误：加载 ${file.name} 失败，状态码: ${xhr.status}`;
       }
+    }
+    
+    xhr.onerror = function() {
+      fileNotification.textContent = `错误：加载 ${file.name} 失败，请检查网络连接。`;
     }
     
     xhr.send();
@@ -782,7 +812,7 @@
     const wordObj = currentWords[currentIndex];
     instructionEl.textContent = `第 ${level + 1} 关 第 ${currentIndex - start + 1} 个词`;
     definitionEl.textContent = `中文提示：${wordObj.definition}`;
-    questionEl.textContent = "请在下方填写完整单词：";
+    questionEl.textContent = "请补全单词：";
 
     // 生成输入框（首字母固定）
     const first = document.createElement("input");
@@ -1100,5 +1130,4 @@
   loadNext();
 </script>
 </body>
-</html>
-    
+</html>    
