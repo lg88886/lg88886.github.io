@@ -400,11 +400,9 @@
     { question: "2，3，5，7，11，__？", options: ["12", "13", "14", "15"], answer: "13" }
   ];
 
-  // 多文件支持 - 预定义的单词库文件名（需放在与HTML相同目录下）
+  // 多文件支持 - 预定义的单词库文件名
   const predefinedWordFiles = [
     {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
-    {id: "intermediate", name: "中级单词库", filename: "intermediate_words.txt"},
-    {id: "advanced", name: "高级单词库", filename: "advanced_words.txt"},
   ];
 
   // 单词文件存储
@@ -526,7 +524,7 @@
       
       // 加载文件进度
       loadFileProgress();
-      currentIndex = 0;
+      currentIndex = currentIndex; // 保持当前单词索引
       isReviewMode = false;
       
       // 更新删除按钮状态
@@ -584,7 +582,8 @@
             
             // 加载文件进度
             loadFileProgress();
-            currentIndex = 0;
+            // 保持当前单词索引不变
+            currentIndex = currentIndex; 
             isReviewMode = false;
             
             // 更新删除按钮状态
@@ -624,13 +623,13 @@
     localStorage.setItem('wordFileProgress', JSON.stringify(progressData));
   }
 
-  // 加载文件的进度
+  // 加载文件的进度 - 核心修改：保存并恢复当前单词索引
   function loadFileProgress() {
     const progressData = JSON.parse(localStorage.getItem('wordFileProgress') || '{}');
     const fileProgress = progressData[currentFile] || {};
     
     // 应用文件特定的进度数据
-    currentIndex = fileProgress.currentIndex || 0;
+    currentIndex = fileProgress.currentIndex || 0;  // 关键：恢复当前单词索引
     level = fileProgress.level || 0;
     correctCount = fileProgress.correctCount || 0;
     wrongList = fileProgress.wrongList || [];
@@ -642,6 +641,11 @@
       });
     }
   }
+
+  // 页面关闭或刷新时保存进度
+  window.addEventListener('beforeunload', function() {
+    saveCurrentFileProgress();
+  });
 
   // 删除当前文件的进度数据（而非文件本身）
   function deleteCurrentFile() {
@@ -683,7 +687,7 @@
   // 重置游戏进度
   function resetProgress() {
     if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
-      currentIndex = 0;
+      currentIndex = 0;  // 重置为第一个单词
       level = 0;
       correctCount = 0;
       wrongList = [];
@@ -696,7 +700,7 @@
 
   function updateStats() {
     const currentWords = wordFiles[currentFile].words;
-    statsEl.textContent = `正确：${correctCount}  错误：${wrongList.length}  进度：${currentIndex} / ${currentWords.length}`;
+    statsEl.textContent = `正确：${correctCount}  错误：${wrongList.length}  进度：${currentIndex + 1} / ${currentWords.length}`;
   }
 
   function loadNext() {
