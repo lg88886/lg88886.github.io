@@ -103,24 +103,8 @@
       50% { opacity: 1; transform: translate(-50%, 0); }
       100% { opacity: 0; transform: translate(-50%, 20px); }
     }
-    .stars {
-      color: #ffd700;
-      font-size: 24px;
+    .navigation-buttons {
       margin: 10px 0;
-    }
-    .file-notification {
-      color: #f44336;
-      font-size: 14px;
-      margin: 10px 0;
-    }
-    .listening {
-      background-color: #f44336;
-    }
-    .reset-btn {
-      background-color: #2196F3;
-    }
-    .review-btn {
-      background-color: #9C27B0;
     }
   </style>
 </head>
@@ -150,13 +134,14 @@
     <div id="phonetic"></div>
     <div id="question"></div>
     <div class="letter-box" id="letterBox"></div>
-    <div>
-      <button onclick="startListening()" id="startReadingBtn" style="display:none">🗣️开始朗读</button>
-      <button onclick="submitAnswer()" id="nextBtn">📝跳过此题</button>
+    <div class="navigation-buttons">
+      <button onclick="prevQuestion()" id="prevBtn">上一题</button>
+      <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
+      <button onclick="submitAnswer()" id="nextBtn">跳过此题</button>
       <button onclick="readWord()">🔊 听单词</button>
-      <button onclick="resetProgress()" class="reset-btn">🔄重置进度</button>
-      <button onclick="exitReview()" class="review-btn" style="display:none">🏃返回闯关</button>
-      <button onclick="showMistakes()" class="review-btn">📖查看错题本</button>
+      <button onclick="resetProgress()" class="reset-btn">重置进度</button>
+      <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
+      <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
     </div>
     <div id="options"></div>
     <div id="result"></div>
@@ -319,6 +304,7 @@
   const letterBox = document.getElementById("letterBox");
   const statsEl = document.getElementById("stats");
   const nextBtn = document.getElementById("nextBtn");
+  const prevBtn = document.getElementById("prevBtn");
   const startReadingBtn = document.getElementById("startReadingBtn");
   const deleteFileBtn = document.getElementById("deleteFileBtn");
   const fileNotification = document.getElementById("fileNotification");
@@ -576,20 +562,6 @@
     saveCurrentFileProgress();
   }
 
-  // 重置游戏进度
-  function resetProgress() {
-    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
-      currentIndex = 0;
-      level = 0;
-      correctCount = 0;
-      wrongList = [];
-      levelStars = [];
-      puzzleQuestions.forEach(q => q.used = false);
-      saveProgress();
-      loadNext();
-    }
-  }
-
   function updateStats() {
     const currentWords = wordFiles[currentFile].words;
     statsEl.textContent = `正确：${correctCount}  错误：${wrongList.length}  进度：${currentIndex + 1} / ${currentWords.length}`;
@@ -607,6 +579,13 @@
     nextBtn.disabled = false;
     nextBtn.textContent = isReviewMode ? "下一个错题" : "跳过此题";
     
+    // 更新上一题按钮状态
+    if (isReviewMode) {
+      prevBtn.disabled = currentReviewIndex <= 0;
+    } else {
+      prevBtn.disabled = currentIndex <= 0;
+    }
+
     // 错题回顾模式
     if (isReviewMode) {
       document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
@@ -617,6 +596,7 @@
         phoneticEl.textContent = "";
         questionEl.textContent = "";
         nextBtn.style.display = "none";
+        prevBtn.style.display = "none";
         return;
       }
       // 确保索引在有效范围内
@@ -667,6 +647,7 @@
       phoneticEl.textContent = "";
       questionEl.textContent = "";
       nextBtn.style.display = "none";
+      prevBtn.style.display = "none";
       return;
     }
 
@@ -699,6 +680,36 @@
     
     // 自动播放当前单词读音
     setTimeout(() => readWord(), 500);
+  }
+
+  // 上一题功能
+  function prevQuestion() {
+    if (isReviewMode) {
+      // 复习模式：返回到上一个错题
+      if (currentReviewIndex > 0) {
+        currentReviewIndex--;
+        loadNext();
+      }
+      return;
+    }
+    
+    // 正常闯关模式：返回到上一个单词
+    if (currentIndex > 0) {
+      // 检查当前单词是否已被标记为错误
+      const currentWords = wordFiles[currentFile].words;
+      const currentWord = currentWords[currentIndex];
+      const isAlreadyInWrong = wrongList.some(item => item.word === currentWord.word);
+      
+      // 如果是正确回答后前进的，需要调整正确计数
+      if (!isAlreadyInWrong && currentStreak > 0) {
+        correctCount--;
+        currentStreak--;
+      }
+      
+      currentIndex--;
+      saveProgress();
+      loadNext();
+    }
   }
 
   // 检查是否所有输入框都已填满
@@ -920,6 +931,7 @@
     // 确保跳过按钮显示并修改文本
     nextBtn.style.display = "inline-block";
     nextBtn.textContent = "进入下一关";
+    prevBtn.style.display = "none";
 
     // 计算当前关卡星级
     const rate = levelCorrect / 8;
@@ -953,6 +965,7 @@
           saveProgress();
           setTimeout(() => {
             inPuzzle = false;
+            prevBtn.style.display = "inline-block";
             loadNext();
           }, 1000);
         } else {
@@ -976,7 +989,24 @@
 
   function exitReview() {
     isReviewMode = false;
+    prevBtn.style.display = "inline-block";
     loadNext();
+  }
+
+  // 重置进度
+  function resetProgress() {
+    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
+      currentIndex = 0;
+      level = 0;
+      correctCount = 0;
+      wrongList = [];
+      levelStars = [];
+      puzzleQuestions.forEach(q => q.used = false);
+      currentStreak = 0;
+      levelCorrect = 0;
+      saveProgress();
+      loadNext();
+    }
   }
 
   // 输入框事件监听
