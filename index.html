@@ -103,19 +103,6 @@
       50% { opacity: 1; transform: translate(-50%, 0); }
       100% { opacity: 0; transform: translate(-50%, 20px); }
     }
-    .navigation-buttons {
-      margin: 10px 0;
-    }
-	    .stars {
-      color: #ffd700;
-      font-size: 24px;
-      margin: 10px 0;
-    }
-    .file-notification {
-      color: #f44336;
-      font-size: 14px;
-      margin: 10px 0;
-    }
     .listening {
       background-color: #f44336;
     }
@@ -155,7 +142,7 @@
     <div class="letter-box" id="letterBox"></div>
     <div class="navigation-buttons">
       <button onclick="prevQuestion()" id="prevBtn">上一题</button>
-      <button onclick="startListening()" id="startReadingBtn" style="display:none">开始朗读</button>
+      <button onclick="toggleListening()" id="startReadingBtn" style="display:none">开始朗读</button>
       <button onclick="submitAnswer()" id="nextBtn">跳过此题</button>
       <button onclick="readWord()">🔊 听单词</button>
       <button onclick="resetProgress()" class="reset-btn">重置进度</button>
@@ -306,6 +293,7 @@
   let currentReviewIndex = 0;
   let levelCorrect = 0;
   let recognition; // 语音识别对象
+  let isListening = false; // 新增：跟踪语音识别状态
 
   // 标记已使用的谜题
   puzzleQuestions.forEach(q => {
@@ -592,6 +580,10 @@
     letterBox.innerHTML = "";
     updateStats();
     startReadingBtn.style.display = "none";
+    // 重置语音识别状态
+    isListening = false;
+    startReadingBtn.textContent = "开始朗读";
+    startReadingBtn.classList.remove("listening");
     
     // 确保跳过按钮始终显示
     nextBtn.style.display = "inline-block";
@@ -699,6 +691,7 @@
     
     // 自动播放当前单词读音
     setTimeout(() => readWord(), 500);
+    return;
   }
 
   // 上一题功能
@@ -818,6 +811,8 @@
       };
       
       recognition.onend = function() {
+        // 识别结束后重置按钮状态
+        isListening = false;
         startReadingBtn.textContent = "开始朗读";
         startReadingBtn.classList.remove("listening");
       };
@@ -825,6 +820,8 @@
       recognition.onerror = function(event) {
         console.error('语音识别错误:', event.error);
         resultEl.textContent = "语音识别出错，请重试";
+        // 错误时重置按钮状态
+        isListening = false;
         startReadingBtn.textContent = "开始朗读";
         startReadingBtn.classList.remove("listening");
       };
@@ -875,50 +872,32 @@
     }
   }
 
-  // 初始化语音识别
-  function initRecognition() {
-    if ('webkitSpeechRecognition' in window) {
-      recognition = new webkitSpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-      
-      recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript.trim().toLowerCase();
-        processRecognitionResult(transcript);
-      };
-      
-      recognition.onend = function() {
-        startReadingBtn.textContent = "开始朗读";
-        startReadingBtn.classList.remove("listening");
-      };
-      
-      recognition.onerror = function(event) {
-        console.error('语音识别错误:', event.error);
-        resultEl.textContent = "语音识别出错，请重试";
-        startReadingBtn.textContent = "开始朗读";
-        startReadingBtn.classList.remove("listening");
-      };
-    } else {
-      resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
-      startReadingBtn.disabled = true;
-    }
-  }
-
-  // 开始监听语音输入
-  function startListening() {
+  // 切换语音识别状态（开始/结束）
+  function toggleListening() {
     if (!recognition) {
       initRecognition();
     }
     
-    try {
-      recognition.start();
-      startReadingBtn.textContent = "正在聆听...";
-      startReadingBtn.classList.add("listening");
-      resultEl.textContent = "请朗读单词...";
-    } catch (e) {
-      resultEl.textContent = "无法启动语音识别，请重试";
-      console.error('启动语音识别失败:', e);
+    if (isListening) {
+      // 停止语音识别
+      window.speechSynthesis.cancel();
+      recognition.stop();
+      isListening = false;
+      startReadingBtn.textContent = "开始朗读";
+      startReadingBtn.classList.remove("listening");
+      resultEl.textContent = "朗读已停止，请重新点击开始朗读";
+    } else {
+      // 开始语音识别
+      try {
+        recognition.start();
+        isListening = true;
+        startReadingBtn.textContent = "结束朗读";
+        startReadingBtn.classList.add("listening");
+        resultEl.textContent = "请朗读单词...";
+      } catch (e) {
+        resultEl.textContent = "无法启动语音识别，请重试";
+        console.error('启动语音识别失败:', e);
+      }
     }
   }
 
@@ -946,6 +925,10 @@
     phoneticEl.textContent = "";
     resultEl.textContent = "";
     startReadingBtn.style.display = "none";
+    // 重置语音识别状态
+    isListening = false;
+    startReadingBtn.textContent = "开始朗读";
+    startReadingBtn.classList.remove("listening");
     
     // 确保跳过按钮显示并修改文本
     nextBtn.style.display = "inline-block";
@@ -1023,6 +1006,10 @@
       puzzleQuestions.forEach(q => q.used = false);
       currentStreak = 0;
       levelCorrect = 0;
+      // 重置语音识别状态
+      isListening = false;
+      startReadingBtn.textContent = "开始朗读";
+      startReadingBtn.classList.remove("listening");
       saveProgress();
       loadNext();
     }
