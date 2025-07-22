@@ -106,6 +106,25 @@
     .navigation-buttons {
       margin: 10px 0;
     }
+	    .stars {
+      color: #ffd700;
+      font-size: 24px;
+      margin: 10px 0;
+    }
+    .file-notification {
+      color: #f44336;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    .listening {
+      background-color: #f44336;
+    }
+    .reset-btn {
+      background-color: #2196F3;
+    }
+    .review-btn {
+      background-color: #9C27B0;
+    }
   </style>
 </head>
 <body>
@@ -1032,42 +1051,17 @@
     autoCheckAnswer();
   }
 
-function handleKeyDown(e) {
-  if (e.key === "Backspace") {
-    const input = e.target;
-    // 情况1：当前输入框有内容，删除后光标留在当前框
-    if (input.value) {
-      // 删除内容后移除"correct"样式（因为内容已变更）
-      input.value = "";
-      input.classList.remove("correct");
-      e.preventDefault(); // 阻止默认退格行为（避免触发浏览器后退等）
-    } 
-    // 情况2：当前输入框为空，跳转到前一个输入框
-    else {
-      const prev = input.previousElementSibling;
-      if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
-        prev.focus();
-        e.preventDefault(); // 阻止默认行为，避免光标异常跳动
+  function handleKeyDown(e) {
+    if (e.key === "Backspace") {
+      const input = e.target;
+      if (!input.value) {
+        const prev = input.previousElementSibling;
+        if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
+          prev.focus();
+        }
       }
     }
   }
-  // 支持左右方向键切换输入框
-  else if (e.key === "ArrowLeft") {
-    const input = e.target;
-    const prev = input.previousElementSibling;
-    if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
-      prev.focus();
-      e.preventDefault();
-    }
-  } else if (e.key === "ArrowRight") {
-    const input = e.target;
-    const next = input.nextElementSibling;
-    if (next && next.tagName === 'INPUT' && next.classList.contains('letter-input')) {
-      next.focus();
-      e.preventDefault();
-    }
-  }
-}
 
   // 初始化游戏
   initFileSelector();
