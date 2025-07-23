@@ -760,66 +760,217 @@
     }
   }
 
-  /**
-   * 增强版语音识别处理 - 支持模糊匹配
-   * 1. 计算字符串编辑距离（Levenshtein距离）
-   * 2. 根据单词长度动态设置容错阈值
-   * 3. 处理常见发音变体（复数、时态等）
-   */
-  function processRecognitionResult(transcript) {
-    const currentWords = wordFiles[currentFile].words;
-    const wordObj = isReviewMode 
-      ? wrongList[currentReviewIndex] 
-      : currentWords[currentIndex];
-    
-    const target = wordObj.word.toLowerCase();
-    // 预处理识别结果（去除常见冗余词汇）
-    let cleanTranscript = transcript
-      .replace(/^(the |a |an )/, '')  // 去除冠词
-      .replace(/\s+/g, '');           // 去除空格
-    
-    // 处理复数和时态变化
-    const singularTranscript = cleanTranscript.replace(/s$/, '');
-    const singularTarget = target.replace(/s$/, '');
-    const pastTranscript = cleanTranscript.replace(/ed$/, '');
-    const pastTarget = target.replace(/ed$/, '');
-    
-    // 计算编辑距离（Levenshtein算法）
-    const distance = levenshteinDistance(cleanTranscript, target);
-    const singularDistance = levenshteinDistance(singularTranscript, singularTarget);
-    const pastDistance = levenshteinDistance(pastTranscript, pastTarget);
-    
-    // 取最小距离
-    const minDistance = Math.min(distance, singularDistance, pastDistance);
-    
-    // 根据单词长度动态设置阈值
-    const threshold = target.length <= 4 ? 1 : 2;
-    
-    // 判断是否匹配成功
-    if (minDistance <= threshold) {
-      resultEl.textContent = `✅ 朗读正确！（系统识别："${transcript}"）`;
-      correctSound.play();
-      
-      // 延迟一段时间后自动进入下一题
-      setTimeout(() => {
-        if (isReviewMode) {
-          // 复习模式：从错题本中删除当前做对的题目
-          wrongList.splice(currentReviewIndex, 1);
-          loadNext();
-        } else {
-          correctCount++;
-          currentStreak++;
-          levelCorrect++;
-          currentIndex++;
-          saveProgress();
-          loadNext();
-        }
-      }, 1000);
-    } else {
-      resultEl.textContent = `❌ 再试试！（系统识别："${transcript}"）`;
-      wrongSound.play();
-    }
-  }
+	/**
+	 * 增强版语音识别处理 - 提升容错性
+	 * 1. 改进编辑距离算法，支持更复杂的语音变体
+	 * 2. 基于单词长度和语音复杂度动态调整匹配阈值
+	 * 3. 增加常见语音错误的处理规则
+	 * 4. 提供更详细的识别结果反馈
+	 */
+	function processRecognitionResult(transcript) {
+	  const currentWords = wordFiles[currentFile].words;
+	  const wordObj = isReviewMode 
+		? wrongList[currentReviewIndex] 
+		: currentWords[currentIndex];
+	  
+	  const target = wordObj.word.toLowerCase();
+	  let cleanTranscript = preprocessTranscript(transcript);
+	  
+	  // 处理常见语音错误和变体
+	  const variations = generatePhoneticVariations(cleanTranscript);
+	  
+	  // 计算与目标单词的匹配度
+	  let bestDistance = Infinity;
+	  let bestMatch = '';
+	  
+	  // 检查原始词和所有变体
+	  [...variations, cleanTranscript].forEach(variant => {
+		const distance = enhancedLevenshteinDistance(variant, target);
+		if (distance < bestDistance) {
+		  bestDistance = distance;
+		  bestMatch = variant;
+		}
+	  });
+	  
+	  // 计算相似度百分比
+	  const similarity = Math.max(0, 100 - (bestDistance / Math.max(target.length, bestMatch.length) * 100));
+	  
+	  // 基于单词长度和复杂度动态调整阈值
+	  const threshold = calculateThreshold(target);
+	  
+	  // 判断是否匹配成功
+	  if (similarity >= threshold) {
+		resultEl.textContent = `✅ 朗读正确！（相似度: ${similarity.toFixed(1)}%，识别内容: "${transcript}"）`;
+		correctSound.play();
+		
+		// 延迟一段时间后自动进入下一题
+		setTimeout(() => {
+		  if (isReviewMode) {
+			wrongList.splice(currentReviewIndex, 1);
+			loadNext();
+		  } else {
+			correctCount++;
+			currentStreak++;
+			levelCorrect++;
+			currentIndex++;
+			saveProgress();
+			loadNext();
+		  }
+		}, 1000);
+	  } else {
+		resultEl.textContent = `❌ 再试试！（相似度: ${similarity.toFixed(1)}%，识别内容: "${transcript}"）`;
+		wrongSound.play();
+	  }
+	}
+
+	/**
+	 * 预处理识别结果，提高匹配成功率
+	 */
+	function preprocessTranscript(transcript) {
+	  return transcript
+		.toLowerCase()
+		.replace(/^(the |a |an |to |please |say |read )/, '')  // 去除常见前缀
+		.replace(/[.,?!;:"'()\[\]{}]/g, '')  // 去除标点符号
+		.replace(/\s+/g, '');  // 去除空格
+	}
+
+	/**
+	 * 生成常见语音变体，提高识别容错性
+	 */
+	function generatePhoneticVariations(word) {
+	  const variations = [word];
+	  
+	  // 处理复数形式
+	  if (word.endsWith('s') || word.endsWith('es')) {
+		variations.push(word.replace(/s$/, ''));
+		variations.push(word.replace(/es$/, ''));
+	  }
+	  
+	  // 处理过去式和分词
+	  if (word.endsWith('ed')) {
+		variations.push(word.replace(/ed$/, ''));
+		variations.push(word.replace(/ed$/, 'd'));
+	  }
+	  
+	  // 处理进行时
+	  if (word.endsWith('ing')) {
+		variations.push(word.replace(/ing$/, ''));
+		variations.push(word.replace(/ing$/, 'e'));
+	  }
+	  
+	  // 处理常见语音混淆
+	  const soundalikes = {
+		'th': 't',
+		'v': 'f',
+		'w': 'v',
+		'p': 'b',
+		't': 'd',
+		'k': 'g',
+		'sh': 's',
+		'ch': 't',
+		'j': 'd',
+		'z': 's',
+		'c': 'k',
+		'qu': 'k',
+		'ph': 'f'
+	  };
+	  
+	  // 生成语音相似词
+	  Object.keys(soundalikes).forEach(key => {
+		if (word.includes(key)) {
+		  variations.push(word.replace(key, soundalikes[key]));
+		}
+	  });
+	  
+	  return variations;
+	}
+
+	/**
+	 * 增强版编辑距离算法，考虑语音特点
+	 */
+	function enhancedLevenshteinDistance(s, t) {
+	  // 初始化矩阵
+	  const m = s.length;
+	  const n = t.length;
+	  const dp = Array.from(Array(m + 1), () => Array(n + 1).fill(0));
+	  
+	  // 填充第一行和第一列
+	  for (let i = 0; i <= m; i++) dp[i][0] = i;
+	  for (let j = 0; j <= n; j++) dp[0][j] = j;
+	  
+	  // 填充矩阵
+	  for (let i = 1; i <= m; i++) {
+		for (let j = 1; j <= n; j++) {
+		  const cost = (s[i - 1] === t[j - 1]) ? 0 : 1;
+		  
+		  // 考虑语音相似字母的较低替换成本
+		  const substitutionCost = getSubstitutionCost(s[i - 1], t[j - 1]);
+		  
+		  dp[i][j] = Math.min(
+			dp[i - 1][j] + 1,        // 删除
+			dp[i][j - 1] + 1,        // 插入
+			dp[i - 1][j - 1] + substitutionCost  // 替换
+		  );
+		  
+		  // 考虑相邻字符交换的情况（如把"ab"读成"ba"）
+		  if (i > 1 && j > 1 && s[i - 1] === t[j - 2] && s[i - 2] === t[j - 1]) {
+			dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1);
+		  }
+		}
+	  }
+	  
+	  return dp[m][n];
+	}
+
+	/**
+	 * 获取两个字符的替换成本，考虑语音相似性
+	 */
+	function getSubstitutionCost(a, b) {
+	  // 相同字符成本为0
+	  if (a === b) return 0;
+	  
+	  // 语音相似的辅音对
+	  const consonantGroups = [
+		['b', 'p', 'm'],  // 双唇音
+		['f', 'v'],      // 唇齿音
+		['d', 't', 'n'],  // 舌尖中音
+		['z', 's', 'θ', 'ð'],  // 摩擦音
+		['g', 'k', 'ŋ'],  // 舌根音
+		['ʃ', 'ʒ', 'tʃ', 'dʒ']  // 舌面音
+	  ];
+	  
+	  // 检查是否在同一辅音组
+	  for (const group of consonantGroups) {
+		if (group.includes(a) && group.includes(b)) {
+		  return 0.5;  // 语音相似的辅音替换成本较低
+		}
+	  }
+	  
+	  // 元音替换成本稍低
+	  const vowels = ['a', 'e', 'i', 'o', 'u'];
+	  if (vowels.includes(a) && vowels.includes(b)) {
+		return 0.7;
+	  }
+	  
+	  // 其他情况成本为1
+	  return 1;
+	}
+
+	/**
+	 * 根据单词长度和复杂度计算匹配阈值
+	 */
+	function calculateThreshold(word) {
+	  const length = word.length;
+	  
+	  // 短单词需要更高的匹配度
+	  if (length <= 4) return 80;
+	  
+	  // 中等长度单词
+	  if (length <= 7) return 70;
+	  
+	  // 长单词可以容忍更多错误
+	  return 60;
+	}
 
   /**
    * 计算两个字符串的编辑距离（Levenshtein距离）
