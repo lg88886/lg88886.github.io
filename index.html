@@ -269,10 +269,10 @@
   ];
 
   // 多文件支持 - 预定义的单词库文件名
-  const predefinedWordFiles = [
-    {id: "two", name: "二年级单词", filename: "two_words.txt"},
-    {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
-  ];
+ const predefinedWordFiles = [
+  {id: "two", name: "二年级单词", filename: "two_words.txt"},
+  {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
+];
 
   // 单词文件存储
   let wordFiles = {
@@ -440,82 +440,113 @@
   }
 
   // 从服务器/本地加载单词文件
-  function loadWordFileFromServer(file) {
-    fileNotification.textContent = `正在加载 ${file.name}...`;
+	function loadWordFileFromServer(file) {
+	  fileNotification.textContent = `正在加载 ${file.name}...`;
+	  
+	  // 创建一个新的XMLHttpRequest
+	  const xhr = new XMLHttpRequest();
+	  xhr.open('GET', file.filename, true);
+	  
+	  xhr.onload = function() {
+		if (xhr.status === 200) {
+		  try {
+			// 解析TXT文件内容（每行一个单词和释义，用逗号分隔）
+			const content = xhr.responseText;
+			const words = [];
+			const lines = content.split('\n');
+			
+			lines.forEach(line => {
+			  if (line.trim()) {
+				// 改进解析逻辑，支持更多格式
+				const parts = line.split(',');
+				if (parts.length >= 2) {
+				  words.push({ 
+					word: parts[0].trim(), 
+					definition: parts[1].trim(),
+					phonetic: parts.length > 2 ? parts[2].trim() : '无音标'
+				  });
+				}
+			  }
+			});
+			
+			if (words.length > 0) {
+			  // 更新单词文件数据
+			  file.words = words;
+			  file.loaded = true;
+			  
+			  // 保存到本地存储
+			  const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
+			  savedFiles[file.id] = {
+				name: file.name,
+				filename: file.filename,
+				words: words,
+				isCustom: true,
+				loaded: true
+			  };
+			  localStorage.setItem('customWordFiles', JSON.stringify(savedFiles));
+			  
+			  fileNotification.textContent = `${file.name} 加载成功！共 ${words.length} 个单词。`;
+			  
+			  // 加载文件进度
+			  loadFileProgress();
+			  isReviewMode = false;
+			  
+			  // 更新删除按钮状态
+			  updateDeleteButton();
+			  
+			  loadNext();
+			} else {
+			  fileNotification.textContent = `错误：${file.name} 格式不正确，请确保每行包含一个单词和释义，用逗号分隔。`;
+			}
+		  } catch (error) {
+			console.error("解析文件错误:", error);
+			fileNotification.textContent = `错误：无法解析 ${file.name}，请检查文件格式。`;
+		  }
+		} else if (xhr.status === 404) {
+		  // 提供备选方案
+		  fileNotification.textContent = `文件 ${file.name} 不存在，正在加载内置词库...`;
+		  
+		  // 使用内置词库作为备选
+		  file.words = defaultWordList;
+		  file.loaded = true;
+		  
+		  fileNotification.textContent = `${file.name} 内置词库加载成功！共 ${defaultWordList.length} 个单词。`;
+		  
+		  // 加载文件进度
+		  loadFileProgress();
+		  isReviewMode = false;
+		  
+		  // 更新删除按钮状态
+		  updateDeleteButton();
+		  
+		  loadNext();
+		} else {
+		  fileNotification.textContent = `错误：加载 ${file.name} 失败，状态码: ${xhr.status}`;
+		}
+	  }
+  
+  xhr.onerror = function() {
+    // 提供备选方案
+    fileNotification.textContent = `网络错误，无法加载 ${file.name}，正在加载内置词库...`;
     
-    // 创建一个新的XMLHttpRequest
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', file.filename, true);
+    // 使用内置词库作为备选
+    file.words = defaultWordList;
+    file.loaded = true;
     
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        try {
-          // 解析TXT文件内容（每行一个单词和释义，用逗号分隔）
-          const content = xhr.responseText;
-          const words = [];
-          const lines = content.split('\n');
-          
-          lines.forEach(line => {
-            if (line.trim()) {
-              const [word, definition, phonetic] = line.split(',');
-              if (word && definition) {
-                words.push({ 
-                  word: word.trim(), 
-                  definition: definition.trim(),
-                  phonetic: phonetic ? phonetic.trim() : '无音标'
-                });
-              }
-            }
-          });
-          
-          if (words.length > 0) {
-            // 更新单词文件数据
-            file.words = words;
-            file.loaded = true;
-            
-            // 保存到本地存储
-            const savedFiles = JSON.parse(localStorage.getItem('customWordFiles') || '{}');
-            savedFiles[file.id] = {
-              name: file.name,
-              filename: file.filename,
-              words: words,
-              isCustom: true,
-              loaded: true
-            };
-            localStorage.setItem('customWordFiles', JSON.stringify(savedFiles));
-            
-            fileNotification.textContent = `${file.name} 加载成功！共 ${words.length} 个单词。`;
-            
-            // 加载文件进度
-            loadFileProgress();
-            // 保持当前单词索引不变
-            currentIndex = currentIndex; 
-            isReviewMode = false;
-            
-            // 更新删除按钮状态
-            updateDeleteButton();
-            
-            loadNext();
-          } else {
-            fileNotification.textContent = `错误：${file.name} 格式不正确，请确保每行包含一个单词和释义，用逗号分隔。`;
-          }
-        } catch (error) {
-          console.error("解析文件错误:", error);
-          fileNotification.textContent = `错误：无法解析 ${file.name}，请检查文件格式。`;
-        }
-      } else if (xhr.status === 404) {
-        fileNotification.textContent = `错误：未找到 ${file.name}（${file.filename}），请确保文件已放在与HTML相同的目录下。`;
-      } else {
-        fileNotification.textContent = `错误：加载 ${file.name} 失败，状态码: ${xhr.status}`;
-      }
-    }
+    fileNotification.textContent = `${file.name} 内置词库加载成功！共 ${defaultWordList.length} 个单词。`;
     
-    xhr.onerror = function() {
-      fileNotification.textContent = `错误：加载 ${file.name} 失败，请检查网络连接。`;
-    }
+    // 加载文件进度
+    loadFileProgress();
+    isReviewMode = false;
     
-    xhr.send();
+    // 更新删除按钮状态
+    updateDeleteButton();
+    
+    loadNext();
   }
+  
+  xhr.send();
+}
 
   // 保存当前文件的进度
   function saveCurrentFileProgress() {
