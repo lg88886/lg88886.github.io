@@ -726,39 +726,151 @@
     }
   }
 
-  // 初始化语音识别
-  function initRecognition() {
-    if ('webkitSpeechRecognition' in window) {
-      recognition = new webkitSpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-      
-      recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript.trim().toLowerCase();
-        processRecognitionResult(transcript);
-      };
-      
-      recognition.onend = function() {
-        // 识别结束后重置按钮状态
-        isListening = false;
-        startReadingBtn.textContent = "开始朗读";
-        startReadingBtn.classList.remove("listening");
-      };
-      
-      recognition.onerror = function(event) {
-        console.error('语音识别错误:', event.error);
-        resultEl.textContent = "语音识别出错，请重试";
-        // 错误时重置按钮状态
-        isListening = false;
-        startReadingBtn.textContent = "开始朗读";
-        startReadingBtn.classList.remove("listening");
-      };
-    } else {
-      resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
-      startReadingBtn.disabled = true;
-    }
-  }
+	// 初始化语音识别
+	function initRecognition() {
+	  if ('webkitSpeechRecognition' in window) {
+		recognition = new webkitSpeechRecognition();
+		recognition.continuous = false;
+		recognition.interimResults = false;
+		recognition.lang = 'en-US';
+		
+		recognition.onresult = function(event) {
+		  const transcript = event.results[0][0].transcript.trim().toLowerCase();
+		  processRecognitionResult(transcript);
+		};
+		
+		recognition.onend = function() {
+		  // 识别结束后重置按钮状态
+		  isListening = false;
+		  startReadingBtn.textContent = "开始朗读";
+		  startReadingBtn.classList.remove("listening");
+		};
+		
+		recognition.onerror = function(event) {
+		  console.error('语音识别错误:', event.error);
+		  // 更详细的错误处理
+		  if (event.error === 'not-allowed') {
+			resultEl.textContent = "请授予麦克风权限以使用语音识别功能";
+		  } else if (event.error === 'service-not-allowed') {
+			resultEl.textContent = "语音识别服务不可用，请稍后再试";
+		  } else {
+			resultEl.textContent = "语音识别出错，请重试";
+		  }
+		  // 错误时重置按钮状态
+		  isListening = false;
+		  startReadingBtn.textContent = "开始朗读";
+		  startReadingBtn.classList.remove("listening");
+		};
+		
+		// 检查麦克风权限状态
+		navigator.permissions.query({name: 'microphone'}).then(permissionStatus => {
+		  if (permissionStatus.state === 'denied') {
+			resultEl.textContent = "麦克风权限已被拒绝，请在浏览器设置中重新授予权限";
+			startReadingBtn.disabled = true;
+		  }
+		});
+		
+	  } else if ('SpeechRecognition' in window) {
+		// 尝试使用标准API（Firefox等）
+		recognition = new SpeechRecognition();
+		recognition.continuous = false;
+		recognition.interimResults = false;
+		recognition.lang = 'en-US';
+		
+		// 设置相同的事件处理函数
+		recognition.onresult = function(event) {
+		  const transcript = event.results[0][0].transcript.trim().toLowerCase();
+		  processRecognitionResult(transcript);
+		};
+		
+		recognition.onend = function() {
+		  isListening = false;
+		  startReadingBtn.textContent = "开始朗读";
+		  startReadingBtn.classList.remove("listening");
+		};
+		
+		recognition.onerror = function(event) {
+		  console.error('语音识别错误:', event.error);
+		  resultEl.textContent = "语音识别出错，请重试";
+		  isListening = false;
+		  startReadingBtn.textContent = "开始朗读";
+		  startReadingBtn.classList.remove("listening");
+		};
+		
+	  } else {
+		resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
+		startReadingBtn.disabled = true;
+	  }
+	}
+
+	// 改进的发音功能
+	function playWord() {
+	  const currentWords = wordFiles[currentFile].words;
+	  const wordObj = isReviewMode 
+		? wrongList[currentReviewIndex] 
+		: currentWords[currentIndex];
+		
+	  const word = wordObj?.word;
+	  if (!word) return;
+	  
+	  // 重置错误提示
+	  audioErrorEl.textContent = "";
+	  // 停止任何正在播放的音频
+	  window.speechSynthesis.cancel();
+	  wordAudio.pause();
+	  
+	  const lowerWord = word.toLowerCase();
+	  
+	  // 检查缓存中是否已有该单词的音频
+	  if (audioCache[lowerWord]) {
+		// 播放缓存的音频
+		audioCache[lowerWord].play().catch(error => {
+		  console.error('播放缓存音频失败:', error);
+		  audioErrorEl.textContent = "音频播放失败，使用备用发音";
+		  fallbackToSpeechSynthesis(word);
+		});
+		return;
+	  }
+	  
+	  // 显示加载状态
+	  audioErrorEl.textContent = "正在加载发音...";
+	  
+	  // 从dictionaryapi.dev获取单词发音
+	  fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${lowerWord}`)
+		.then(res => {
+		  if (!res.ok) throw new Error(`获取发音失败: ${res.status}`);
+		  return res.json();
+		})
+		.then(data => {
+		  // 提取音频URL
+		  const phonetics = data[0]?.phonetics || [];
+		  const audioUrl = phonetics.find(p => p.audio)?.audio;
+		  
+		  if (audioUrl) {
+			// 清除加载状态
+			audioErrorEl.textContent = "";
+			
+			// 创建音频元素并缓存
+			const audio = new Audio(audioUrl);
+			audioCache[lowerWord] = audio;
+			
+			// 播放音频
+			audio.play().catch(error => {
+			  console.error('播放音频失败:', error);
+			  audioErrorEl.textContent = "音频播放失败，使用备用发音";
+			  fallbackToSpeechSynthesis(word);
+			});
+		  } else {
+			throw new Error('未找到发音资源');
+		  }
+		})
+		.catch(error => {
+		  console.error('获取单词发音失败:', error);
+		  audioErrorEl.textContent = "注意：使用备用发音";
+		  // 请求失败时使用语音合成
+		  fallbackToSpeechSynthesis(word);
+		});
+	}
 
 	/**
 	 * 增强版语音识别处理 - 提升容错性
