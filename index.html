@@ -112,9 +112,6 @@
     .review-btn {
       background-color: #9C27B0;
     }
-    .confirm-container {
-      margin-top: 10px;
-    }
   </style>
 </head>
 <body>
@@ -148,8 +145,6 @@
       <button onclick="toggleListening()" id="startReadingBtn" style="display:none">开始朗读</button>
       <button onclick="submitAnswer()" id="nextBtn">跳过此题</button>
       <button onclick="readWord()">🔊 听单词</button>
-      <button onclick="readSyllables()">🔊 分音节</button>
-      <button onclick="repeatRead()">🔁 重复朗读</button>
       <button onclick="resetProgress()" class="reset-btn">重置进度</button>
       <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
       <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
@@ -157,7 +152,6 @@
     <div id="options"></div>
     <div id="result"></div>
     <div id="stats"></div>
-    <div id="confirmContainer" class="confirm-container" style="display:none"></div>
   </div>
 </div>
 <script>
@@ -300,7 +294,6 @@
   let levelCorrect = 0;
   let recognition; // 语音识别对象
   let isListening = false; // 新增：跟踪语音识别状态
-  let retryCount = 0; // 语音识别重试计数
 
   // 标记已使用的谜题
   puzzleQuestions.forEach(q => {
@@ -322,7 +315,6 @@
   const startReadingBtn = document.getElementById("startReadingBtn");
   const deleteFileBtn = document.getElementById("deleteFileBtn");
   const fileNotification = document.getElementById("fileNotification");
-  const confirmContainer = document.getElementById("confirmContainer");
 
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
@@ -586,15 +578,12 @@
     resultEl.textContent = "";
     optionsEl.innerHTML = "";
     letterBox.innerHTML = "";
-    confirmContainer.innerHTML = "";
-    confirmContainer.style.display = "none";
     updateStats();
     startReadingBtn.style.display = "none";
     // 重置语音识别状态
     isListening = false;
     startReadingBtn.textContent = "开始朗读";
     startReadingBtn.classList.remove("listening");
-    retryCount = 0; // 重置重试计数
     
     // 确保跳过按钮始终显示
     nextBtn.style.display = "inline-block";
@@ -803,7 +792,6 @@
       // 清空输入框
       inputs.forEach(input => {
         input.value = "";
-        input.classList.remove("correct");
       });
       letterBox.querySelector("input.letter-input")?.focus();
     }
@@ -813,55 +801,285 @@
   function initRecognition() {
     if ('webkitSpeechRecognition' in window) {
       recognition = new webkitSpeechRecognition();
-      recognition.continuous = false; // 单次识别
-      recognition.interimResults = true; // 获取中间结果
-      recognition.lang = 'en-US'; // 美式英语
-      recognition.maxAlternatives = 3; // 获取多个候选结果
-      recognition.timeout = 8000; // 8秒超时
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
       
-      // 创建JSGF语法限制识别范围（提高准确率）
-      recognition.grammars = new SpeechGrammarList();
-      const grammar = `#JSGF V1.0; grammar words; public <word> = ${getCurrentWordList().join(' | ')};`;
-      recognition.grammars.addFromString(grammar, 1);
-      
-      // 实时反馈中间结果
       recognition.onresult = function(event) {
-        const results = event.results[0];
-        for (let i = 0; i < results.length; i++) {
-          const transcript = results[i].transcript.trim().toLowerCase();
-          if (results.isFinal) {
-            processRecognitionResult(transcript);
-          } else {
-            // 中间结果显示（帮助用户调整发音）
-            resultEl.textContent = `正在识别：${transcript}`;
-          }
-        }
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        processRecognitionResult(transcript);
       };
       
-      // 识别结束
       recognition.onend = function() {
-        if (isListening) {
-          // 如果用户仍在监听状态，自动重启识别
-          setTimeout(() => {
-            if (isListening) {
-              recognition.start();
-            }
-          }, 500);
-        } else {
-          // 非监听状态，重置按钮
-          startReadingBtn.textContent = "开始朗读";
-          startReadingBtn.classList.remove("listening");
-        }
+        // 识别结束后重置按钮状态
+        isListening = false;
+        startReadingBtn.textContent = "开始朗读";
+        startReadingBtn.classList.remove("listening");
       };
       
-      // 错误处理
       recognition.onerror = function(event) {
-        resetListeningState();
-        switch(event.error) {
-          case "not-allowed":
-            resultEl.textContent = "请允许麦克风权限后重试";
-            break;
-          case "audio-capture":
-            resultEl.textContent = "未检测到麦克风，请检查设备";
-            break;
-          case "no-speech
+        console.error('语音识别错误:', event.error);
+        resultEl.textContent = "语音识别出错，请重试";
+        // 错误时重置按钮状态
+        isListening = false;
+        startReadingBtn.textContent = "开始朗读";
+        startReadingBtn.classList.remove("listening");
+      };
+    } else {
+      resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
+      startReadingBtn.disabled = true;
+    }
+  }
+
+  // 处理语音识别结果
+  function processRecognitionResult(transcript) {
+    const currentWords = wordFiles[currentFile].words;
+    const wordObj = isReviewMode 
+      ? wrongList[currentReviewIndex] 
+      : currentWords[currentIndex];
+    
+    // 比较识别结果和目标单词
+    if (transcript === wordObj.word.toLowerCase()) {
+      resultEl.textContent = "✅ 朗读正确！正在进入下一题...";
+      correctSound.play();
+      
+      // 延迟一段时间后自动进入下一题
+      setTimeout(() => {
+        if (isReviewMode) {
+          // 复习模式：从错题本中删除当前做对的题目
+          wrongList.splice(currentReviewIndex, 1);
+          // 如果删除后错题本为空，显示提示
+          if (wrongList.length === 0) {
+            instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
+            definitionEl.textContent = "继续加油哦！";
+            phoneticEl.textContent = "";
+            questionEl.textContent = "";
+            return;
+          }
+          loadNext();
+        } else {
+          correctCount++;
+          currentStreak++;
+          levelCorrect++;
+          currentIndex++;
+          saveProgress();
+          loadNext();
+        }
+      }, 1000);
+    } else {
+      resultEl.textContent = `❌ 朗读不正确（你读的是: "${transcript}"），请再试一次`;
+      wrongSound.play();
+    }
+  }
+
+  // 切换语音识别状态（开始/结束）
+  function toggleListening() {
+    if (!recognition) {
+      initRecognition();
+    }
+    
+    if (isListening) {
+      // 停止语音识别
+      window.speechSynthesis.cancel();
+      recognition.stop();
+      isListening = false;
+      startReadingBtn.textContent = "开始朗读";
+      startReadingBtn.classList.remove("listening");
+      resultEl.textContent = "朗读已停止，请重新点击开始朗读";
+    } else {
+      // 开始语音识别
+      try {
+        recognition.start();
+        isListening = true;
+        startReadingBtn.textContent = "结束朗读";
+        startReadingBtn.classList.add("listening");
+        resultEl.textContent = "请朗读单词...";
+      } catch (e) {
+        resultEl.textContent = "无法启动语音识别，请重试";
+        console.error('启动语音识别失败:', e);
+      }
+    }
+  }
+
+  function readWord() {
+    const currentWords = wordFiles[currentFile].words;
+    const word = isReviewMode 
+      ? wrongList[currentReviewIndex]?.word 
+      : currentWords[currentIndex]?.word;
+      
+    if (!word) return;
+    
+    // 停止任何正在播放的语音
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(word);
+    utter.lang = "en-US";
+    utter.rate = 0.9;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function showPuzzle() {
+    inPuzzle = true;
+    letterBox.innerHTML = "";
+    optionsEl.innerHTML = "";
+    definitionEl.textContent = "";
+    phoneticEl.textContent = "";
+    resultEl.textContent = "";
+    startReadingBtn.style.display = "none";
+    // 重置语音识别状态
+    isListening = false;
+    startReadingBtn.textContent = "开始朗读";
+    startReadingBtn.classList.remove("listening");
+    
+    // 确保跳过按钮显示并修改文本
+    nextBtn.style.display = "inline-block";
+    nextBtn.textContent = "进入下一关";
+    prevBtn.style.display = "none";
+
+    // 计算当前关卡星级
+    const rate = levelCorrect / 8;
+    let stars = 1;
+    if (rate === 1) stars = 3;
+    else if (rate >= 0.75) stars = 2;
+    levelStars.push(stars);
+
+    const unused = puzzleQuestions.filter(q => !q.used);
+    if (unused.length === 0) {
+      levelCorrect = 0;
+      loadNext();
+      return;
+    }
+    const puzzle = unused[Math.floor(Math.random() * unused.length)];
+    puzzle.used = true;
+    questionEl.textContent = `🎯 关卡挑战：${puzzle.question}`;
+    definitionEl.innerHTML = `本关评分：${"⭐".repeat(stars)}`;
+
+    puzzle.options.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.textContent = opt;
+      btn.className = "option-btn";
+      btn.onclick = () => {
+        if (opt === puzzle.answer) {
+          resultEl.textContent = "🎉 答对了，进入下一关！";
+          correctSound.play();
+          level++;
+          levelCorrect = 0;
+          currentIndex = level * 8;
+          saveProgress();
+          setTimeout(() => {
+            inPuzzle = false;
+            prevBtn.style.display = "inline-block";
+            loadNext();
+          }, 1000);
+        } else {
+          resultEl.textContent = "😥 再试试！";
+          wrongSound.play();
+        }
+      };
+      optionsEl.appendChild(btn);
+    });
+  }
+
+  function showMistakes() {
+    if (wrongList.length === 0) {
+      alert("目前没有错题！");
+      return;
+    }
+    isReviewMode = true;
+    currentReviewIndex = 0;
+    loadNext();
+  }
+
+  function exitReview() {
+    isReviewMode = false;
+    prevBtn.style.display = "inline-block";
+    loadNext();
+  }
+
+  // 重置进度
+  function resetProgress() {
+    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
+      currentIndex = 0;
+      level = 0;
+      correctCount = 0;
+      wrongList = [];
+      levelStars = [];
+      puzzleQuestions.forEach(q => q.used = false);
+      currentStreak = 0;
+      levelCorrect = 0;
+      // 重置语音识别状态
+      isListening = false;
+      startReadingBtn.textContent = "开始朗读";
+      startReadingBtn.classList.remove("listening");
+      saveProgress();
+      loadNext();
+    }
+  }
+
+  // 输入框事件监听
+  function addInputListeners(input) {
+    input.addEventListener('input', handleInput);
+    input.addEventListener('keydown', handleKeyDown);
+    input.addEventListener('compositionstart', () => isComposing = true);
+    input.addEventListener('compositionend', (e) => {
+      isComposing = false;
+      handleInput(e);
+    });
+  }
+
+  let isComposing = false;
+  function handleInput(e) {
+    if (isComposing) return;
+    const input = e.target;
+    input.value = input.value.slice(0, 1).toLowerCase();
+    input.classList.add("correct");
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT') next.focus();
+    
+    autoCheckAnswer();
+  }
+
+function handleKeyDown(e) {
+  if (e.key === "Backspace") {
+    const input = e.target;
+    // 情况1：当前输入框有内容，删除后光标留在当前框
+    if (input.value) {
+      // 删除内容后移除"correct"样式（因为内容已变更）
+      input.value = "";
+      input.classList.remove("correct");
+      e.preventDefault(); // 阻止默认退格行为（避免触发浏览器后退等）
+    } 
+    // 情况2：当前输入框为空，跳转到前一个输入框
+    else {
+      const prev = input.previousElementSibling;
+      if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
+        prev.focus();
+        e.preventDefault(); // 阻止默认行为，避免光标异常跳动
+      }
+    }
+  }
+  // 支持左右方向键切换输入框
+  else if (e.key === "ArrowLeft") {
+    const input = e.target;
+    const prev = input.previousElementSibling;
+    if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
+      prev.focus();
+      e.preventDefault();
+    }
+  } else if (e.key === "ArrowRight") {
+    const input = e.target;
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT' && next.classList.contains('letter-input')) {
+      next.focus();
+      e.preventDefault();
+    }
+  }
+}
+
+  // 初始化游戏
+  initFileSelector();
+  loadFileProgress();
+  initRecognition();
+  loadNext();
+</script>
+</body>
+</html>    
