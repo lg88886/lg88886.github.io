@@ -25,6 +25,7 @@
             'streak': 'streak 1s forwards',
             'fade-in': 'fadeIn 0.5s ease',
             'slide-up': 'slideUp 0.5s ease-out',
+            'highlight': 'highlight 1s ease',
           },
           keyframes: {
             pop: {
@@ -44,6 +45,10 @@
               '0%': { transform: 'translateY(20px)', opacity: '0' },
               '100%': { transform: 'translateY(0)', opacity: '1' },
             },
+            highlight: {
+              '0%, 100%': { background: '#EF4444' },
+              '50%': { background: '#f87171' },
+            }
           },
         },
       }
@@ -92,6 +97,9 @@
       }
       #similarityMeter {
         transition: all 0.3s ease;
+      }
+      .word-input.highlight {
+        animation: highlight 1s ease;
       }
     }
   </style>
@@ -171,6 +179,9 @@
           <button onclick="exitReview()" class="game-btn bg-green-500 text-white focus:ring-green-500" style="display:none">
             <i class="fa fa-arrow-left mr-1"></i> 返回闯关
           </button>
+          <button onclick="nextQuestion()" id="continueBtn" class="game-btn bg-secondary text-white focus:ring-secondary" style="display:none">
+            <i class="fa fa-arrow-right mr-1"></i> 继续下一题
+          </button>
         </div>
 
         <!-- 相似度指示器 -->
@@ -208,7 +219,7 @@
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
   <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
 
   <!-- 连续正确提示 -->
@@ -283,6 +294,7 @@
     let recognition;
     let isListening = false;
     let showFullFirstLetter = false;
+    let answerCorrect = false; // 标记答案是否正确
 
     // DOM元素
     const [instructionEl, questionEl, resultEl, optionsEl, definitionEl, phoneticEl, letterBox, statsEl] = 
@@ -309,77 +321,77 @@
     }
 
     // 加载单词文件
-	function loadSelectedWordFile() {
-	  const selectedFile = document.getElementById("wordFileSelect").value;
-	  if (selectedFile === currentFile) return;
-	  
-	  saveCurrentFileProgress();
-	  currentFile = selectedFile;
-	  fileNotification.textContent = "";
-	  updateDeleteButton();
-	  
-	  const file = wordFiles[currentFile];
-	  if (!file.loaded) {
-		fileNotification.textContent = `正在加载 ${file.name}...`;
-		
-		// 词库文件路径
-		const fileName = {
-		  "two": "two_words.txt",
-		  "basic": "basic_words.txt"
-		}[currentFile];
+    function loadSelectedWordFile() {
+      const selectedFile = document.getElementById("wordFileSelect").value;
+      if (selectedFile === currentFile) return;
+      
+      saveCurrentFileProgress();
+      currentFile = selectedFile;
+      fileNotification.textContent = "";
+      updateDeleteButton();
+      
+      const file = wordFiles[currentFile];
+      if (!file.loaded) {
+        fileNotification.textContent = `正在加载 ${file.name}...`;
+        
+        // 词库文件路径
+        const fileName = {
+          "two": "two_words.txt",
+          "basic": "basic_words.txt"
+        }[currentFile];
 
-		// 读取并解析逗号分隔的TXT文件
-		fetch(fileName)
-		  .then(response => {
-			if (!response.ok) throw new Error("文件不存在或加载失败");
-			return response.text();
-		  })
-		  .then(text => {
-			const words = [];
-			// 按行分割，过滤空行和无效行
-			const lines = text.split('\n')
-			  .map(line => line.trim())
-			  .filter(line => line);
+        // 读取并解析逗号分隔的TXT文件
+        fetch(fileName)
+          .then(response => {
+            if (!response.ok) throw new Error("文件不存在或加载失败");
+            return response.text();
+          })
+          .then(text => {
+            const words = [];
+            // 按行分割，过滤空行和无效行
+            const lines = text.split('\n')
+              .map(line => line.trim())
+              .filter(line => line);
 
-			lines.forEach((line, index) => {
-			  // 按英文逗号分割（核心修改：适配你的格式）
-			  const parts = line.split(',');
-			  
-			  // 校验格式（至少包含单词和释义）
-			  if (parts.length < 2) {
-				console.warn(`第${index+1}行格式错误（需逗号分隔），跳过：${line}`);
-				return;
-			  }
-			  
-			  // 提取字段（适配原游戏逻辑）
-			  words.push({
-				word: parts[0].trim(), // 单词（如：morning）
-				definition: parts[1].trim(), // 中文释义（如：早晨；上午）
-				phonetic: parts[2]?.trim() || '无' // 音标（如：/ˈmɔːnɪŋ/，可选）
-			  });
-			});
+            lines.forEach((line, index) => {
+              // 按英文逗号分割
+              const parts = line.split(',');
+              
+              // 校验格式（至少包含单词和释义）
+              if (parts.length < 2) {
+                console.warn(`第${index+1}行格式错误（需逗号分隔），跳过：${line}`);
+                return;
+              }
+              
+              // 提取字段
+              words.push({
+                word: parts[0].trim(),
+                definition: parts[1].trim(),
+                phonetic: parts[2]?.trim() || '无'
+              });
+            });
 
-			if (words.length === 0) {
-			  throw new Error("未解析到有效单词，请检查文件格式");
-			}
+            if (words.length === 0) {
+              throw new Error("未解析到有效单词，请检查文件格式");
+            }
 
-			// 加载成功，更新游戏数据
-			file.words = words;
-			file.loaded = true;
-			fileNotification.textContent = `加载成功！共 ${words.length} 个单词`;
-			loadFileProgress();
-			loadNext();
-		  })
-		  .catch(error => {
-			fileNotification.textContent = `加载失败：${error.message}`;
-			console.error("词库加载错误：", error);
-		  });
-		return;
-	  }
-	  
-	  loadFileProgress();
-	  loadNext();
-	}
+            // 加载成功，更新游戏数据
+            file.words = words;
+            file.loaded = true;
+            fileNotification.textContent = `加载成功！共 ${words.length} 个单词`;
+            loadFileProgress();
+            loadNext();
+          })
+          .catch(error => {
+            fileNotification.textContent = `加载失败：${error.message}`;
+            console.error("词库加载错误：", error);
+          });
+        return;
+      }
+      
+      loadFileProgress();
+      loadNext();
+    }
 
     // 进度存储与加载
     function saveCurrentFileProgress() {
@@ -418,6 +430,9 @@
       letterBox.innerHTML = "";
       similarityMeter.style.display = "none";
       streakReward.classList.add("hidden");
+      nextBtn.style.display = "inline-block";
+      continueBtn.style.display = "none";
+      answerCorrect = false;
       updateStats();
 
       // 按钮状态更新
@@ -554,34 +569,44 @@
         resultEl.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
         resultEl.textContent = `🎉 正确！单词：${currentWord.word}`;
         correctSound.play();
-        correctCount++;
-        currentStreak++;
-        levelCorrect++;
-
-        // 移除错题（如果在复习模式）
-        if (isReviewMode) {
-          wrongList = wrongList.filter(w => w.word !== currentWord.word);
-        }
-
-        // 检查连续正确奖励
-        if (streakRewards[currentStreak]) {
-          showReward(currentStreak);
-        } else {
-          // 自动进入下一题
-          setTimeout(nextQuestion, 1000);
-        }
+        answerCorrect = true;
+        
+        // 提示用户朗读单词
+        setTimeout(() => {
+          resultEl.textContent += " 请朗读单词以继续下一题";
+          startReadingBtn.focus();
+        }, 500);
       } else {
         resultEl.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
         resultEl.textContent = `❌ 错误！正确单词：${currentWord.word}`;
         wrongSound.play();
         currentStreak = 0;
         
-        // 添加到错题本（去重）
+        // 添加到错题本
         if (!wrongList.some(w => w.word === currentWord.word)) {
           wrongList.push(currentWord);
         }
 
-        setTimeout(nextQuestion, 1500);
+        // 高亮错误字母1秒后清空
+        setTimeout(() => {
+          const inputs = letterBox.querySelectorAll("input");
+          inputs.forEach((input, i) => {
+            const correctChar = currentWord.word[i + 1].toLowerCase();
+            if (input.value.toLowerCase() !== correctChar) {
+              input.classList.add('highlight');
+            }
+          });
+          
+          // 1秒后清空输入框
+          setTimeout(() => {
+            inputs.forEach(input => {
+              input.value = '';
+              input.className = 'word-input';
+              input.classList.remove('highlight');
+            });
+            letterBox.querySelector("input")?.focus();
+          }, 1000);
+        }, 500);
       }
 
       saveProgress();
@@ -602,7 +627,19 @@
       if (isReviewMode) {
         currentReviewIndex++;
       } else {
+        // 只有答案正确且已朗读才能继续
+        if (!answerCorrect) return;
+        
+        correctCount++;
+        currentStreak++;
+        levelCorrect++;
         currentIndex++;
+        
+        // 检查连续正确奖励
+        if (streakRewards[currentStreak]) {
+          showReward(currentStreak);
+          return;
+        }
       }
       loadNext();
     }
@@ -732,13 +769,41 @@
 
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript.toLowerCase();
-        const inputs = letterBox.querySelectorAll("input");
-        // 将识别结果填充到输入框
-        for (let i = 0; i < transcript.length && i < inputs.length; i++) {
-          inputs[i].value = transcript[i];
+        
+        // 获取当前单词
+        const currentWord = isReviewMode 
+          ? wrongList[currentReviewIndex].word.toLowerCase()
+          : wordFiles[currentFile].words[currentIndex].word.toLowerCase();
+        
+        // 检查语音是否匹配单词（包括变体）
+        const variants = [currentWord, ...(pronunciationVariants[currentWord] || [])];
+        const isMatch = variants.some(variant => 
+          transcript.includes(variant) || variant.includes(transcript)
+        );
+
+        // 处理识别结果
+        if (isMatch) {
+          if (answerCorrect) {
+            resultEl.textContent = `🎉 语音识别成功！单词：${currentWord}`;
+            setTimeout(() => {
+              correctCount++;
+              currentStreak++;
+              levelCorrect++;
+              
+              // 移除错题（如果在复习模式）
+              if (isReviewMode) {
+                wrongList = wrongList.filter(w => w.word.toLowerCase() !== currentWord);
+              }
+              
+              saveProgress();
+              nextQuestion();
+            }, 1000);
+          } else {
+            resultEl.textContent = `语音识别：${transcript}，请先正确拼写单词`;
+          }
+        } else {
+          resultEl.textContent = `未能识别："${transcript}"，请尝试再次朗读 "${currentWord}"`;
         }
-        // 如果填满则自动检查
-        if (checkAllFilled()) checkAnswer();
       };
 
       recognition.onend = () => {
@@ -762,6 +827,7 @@
         isListening = true;
         startReadingBtn.textContent = "正在聆听...";
         startReadingBtn.classList.add("listening");
+        resultEl.textContent = "请朗读单词...";
       }
     }
 
@@ -866,10 +932,10 @@
     function readWord() {
       // 语音合成（朗读单词）
       const currentWord = isReviewMode 
-        ? wrongList[currentReviewIndex] 
-        : wordFiles[currentFile].words[currentIndex];
+        ? wrongList[currentReviewIndex].word
+        : wordFiles[currentFile].words[currentIndex].word;
       
-      const utterance = new SpeechSynthesisUtterance(currentWord.word);
+      const utterance = new SpeechSynthesisUtterance(currentWord);
       utterance.lang = 'en-US';
       speechSynthesis.speak(utterance);
     }
