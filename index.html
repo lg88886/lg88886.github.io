@@ -457,6 +457,8 @@
 
     // 加载下一题
     function loadNext() {
+      // 新增：清除谜题问题
+      questionEl.textContent = "";
       // 重置UI状态
       resultEl.textContent = "";
       optionsEl.innerHTML = "";
