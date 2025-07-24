@@ -309,37 +309,77 @@
     }
 
     // 加载单词文件
-    function loadSelectedWordFile() {
-      const selectedFile = document.getElementById("wordFileSelect").value;
-      if (selectedFile === currentFile) return;
-      
-      saveCurrentFileProgress();
-      currentFile = selectedFile;
-      fileNotification.textContent = "";
-      updateDeleteButton();
-      
-      const file = wordFiles[currentFile];
-      if (!file.loaded) {
-        fileNotification.textContent = `正在加载 ${file.name}...`;
-        // 模拟加载（实际项目中替换为真实请求）
-        setTimeout(() => {
-          // 模拟自定义词库内容
-          const mockWords = defaultWordList.map(item => ({
-            ...item,
-            word: item.word + (currentFile === "two" ? "2" : "3")
-          }));
-          file.words = mockWords;
-          file.loaded = true;
-          fileNotification.textContent = `加载成功！共 ${file.words.length} 个单词`;
-          loadFileProgress();
-          loadNext();
-        }, 800);
-        return;
-      }
-      
-      loadFileProgress();
-      loadNext();
-    }
+	function loadSelectedWordFile() {
+	  const selectedFile = document.getElementById("wordFileSelect").value;
+	  if (selectedFile === currentFile) return;
+	  
+	  saveCurrentFileProgress();
+	  currentFile = selectedFile;
+	  fileNotification.textContent = "";
+	  updateDeleteButton();
+	  
+	  const file = wordFiles[currentFile];
+	  if (!file.loaded) {
+		fileNotification.textContent = `正在加载 ${file.name}...`;
+		
+		// 词库文件路径
+		const fileName = {
+		  "two": "two_words.txt",
+		  "basic": "basic_words.txt"
+		}[currentFile];
+
+		// 读取并解析逗号分隔的TXT文件
+		fetch(fileName)
+		  .then(response => {
+			if (!response.ok) throw new Error("文件不存在或加载失败");
+			return response.text();
+		  })
+		  .then(text => {
+			const words = [];
+			// 按行分割，过滤空行和无效行
+			const lines = text.split('\n')
+			  .map(line => line.trim())
+			  .filter(line => line);
+
+			lines.forEach((line, index) => {
+			  // 按英文逗号分割（核心修改：适配你的格式）
+			  const parts = line.split(',');
+			  
+			  // 校验格式（至少包含单词和释义）
+			  if (parts.length < 2) {
+				console.warn(`第${index+1}行格式错误（需逗号分隔），跳过：${line}`);
+				return;
+			  }
+			  
+			  // 提取字段（适配原游戏逻辑）
+			  words.push({
+				word: parts[0].trim(), // 单词（如：morning）
+				definition: parts[1].trim(), // 中文释义（如：早晨；上午）
+				phonetic: parts[2]?.trim() || '无' // 音标（如：/ˈmɔːnɪŋ/，可选）
+			  });
+			});
+
+			if (words.length === 0) {
+			  throw new Error("未解析到有效单词，请检查文件格式");
+			}
+
+			// 加载成功，更新游戏数据
+			file.words = words;
+			file.loaded = true;
+			fileNotification.textContent = `加载成功！共 ${words.length} 个单词`;
+			loadFileProgress();
+			loadNext();
+		  })
+		  .catch(error => {
+			fileNotification.textContent = `加载失败：${error.message}`;
+			console.error("词库加载错误：", error);
+		  });
+		return;
+	  }
+	  
+	  loadFileProgress();
+	  loadNext();
+	}
 
     // 进度存储与加载
     function saveCurrentFileProgress() {
