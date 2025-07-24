@@ -124,10 +124,6 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    .error-indicator {
-      color: #f44336;
-      margin-left: 5px;
-    }
   </style>
 </head>
 <body>
@@ -161,7 +157,7 @@
       <button onclick="prevQuestion()" id="prevBtn">上一题</button>
       <button onclick="toggleListening()" id="startReadingBtn" style="display:none">开始朗读</button>
       <button onclick="submitAnswer()" id="nextBtn">跳过此题</button>
-      <button onclick="readWord()" id="readWordBtn">🔊 听单词</button>
+      <button onclick="readWord()">🔊 听单词</button>
       <button onclick="resetProgress()" class="reset-btn">重置进度</button>
       <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
       <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
@@ -311,7 +307,6 @@
   let levelCorrect = 0;
   let recognition; // 语音识别对象
   let isListening = false; // 新增：跟踪语音识别状态
-  let pronunciationLoadingTimeout; // 发音加载超时计时器
 
   // 缓存API获取的发音URL，避免重复请求
   let audioCache = {};
@@ -337,7 +332,6 @@
   const deleteFileBtn = document.getElementById("deleteFileBtn");
   const fileNotification = document.getElementById("fileNotification");
   const wordAudio = document.getElementById("word-audio");
-  const readWordBtn = document.getElementById("readWordBtn");
 
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
@@ -939,29 +933,20 @@
     if (!word) return;
     
     // 显示加载状态
-    const originalText = readWordBtn.innerHTML;
-    readWordBtn.innerHTML = '<span class="loading-indicator"></span> 加载中...';
-    readWordBtn.disabled = true;
-    
-    // 设置超时计时器（5秒）
-    pronunciationLoadingTimeout = setTimeout(() => {
-      readWordBtn.innerHTML = '🔊 听单词 <span class="error-indicator">加载超时</span>';
-      readWordBtn.disabled = false;
-      resultEl.textContent = "发音加载超时，点击按钮重试";
-    }, 5000);
+    const readButton = document.querySelector('button[onclick="readWord()"]');
+    const originalText = readButton.innerHTML;
+    readButton.innerHTML = '<span class="loading-indicator"></span> 加载中...';
+    readButton.disabled = true;
     
     // 先检查缓存
     if (audioCache[word]) {
-      clearTimeout(pronunciationLoadingTimeout);
-      playAudio(audioCache[word], readWordBtn, originalText);
+      playAudio(audioCache[word], readButton, originalText);
       return;
     }
     
     // 调用Free Dictionary API获取发音
     fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
       .then(response => {
-        clearTimeout(pronunciationLoadingTimeout);
-        
         if (!response.ok) {
           throw new Error(`API请求失败: ${response.status}`);
         }
@@ -989,17 +974,16 @@
         if (audioUrl) {
           // 缓存结果
           audioCache[word] = audioUrl;
-          playAudio(audioUrl, readWordBtn, originalText);
+          playAudio(audioUrl, readButton, originalText);
         } else {
           // 未找到发音，回退到浏览器TTS
-          fallbackToTTS(word, readWordBtn, originalText);
+          fallbackToTTS(word, readButton, originalText);
         }
       })
       .catch(error => {
-        clearTimeout(pronunciationLoadingTimeout);
         console.error('获取发音失败:', error);
         // API调用失败，回退到浏览器TTS
-        fallbackToTTS(word, readWordBtn, originalText);
+        fallbackToTTS(word, readButton, originalText);
       });
   }
 
@@ -1009,8 +993,6 @@
     wordAudio.play()
       .then(() => {
         console.log('音频播放成功');
-        button.innerHTML = originalText;
-        button.disabled = false;
       })
       .catch(error => {
         console.error('音频播放失败:', error);
@@ -1021,6 +1003,11 @@
         if (word) {
           fallbackToTTS(word, button, originalText);
         }
+      })
+      .finally(() => {
+        // 恢复按钮状态
+        button.innerHTML = originalText;
+        button.disabled = false;
       });
   }
 
@@ -1042,19 +1029,18 @@
       utterance.onend = () => {
         button.innerHTML = originalText;
         button.disabled = false;
-        resultEl.textContent = "使用浏览器语音朗读（API未找到发音）";
       };
       
       // 监听TTS错误事件
       utterance.onerror = (event) => {
         console.error('TTS播放错误:', event.error);
-        resultEl.textContent = "发音加载失败，请重试";
+        resultEl.textContent = "播放失败，请重试";
         button.innerHTML = originalText;
         button.disabled = false;
       };
     } else {
       // 浏览器不支持TTS
-      resultEl.textContent = "发音加载失败，且您的浏览器不支持语音播放";
+      resultEl.textContent = "您的浏览器不支持语音播放";
       button.innerHTML = originalText;
       button.disabled = false;
     }
@@ -1064,3 +1050,165 @@
     inPuzzle = true;
     letterBox.innerHTML = "";
     optionsEl.innerHTML = "";
+    resultEl.textContent = "";
+    startReadingBtn.style.display = "none";
+    // 重置语音识别状态
+    isListening = false;
+    startReadingBtn.textContent = "开始朗读";
+    startReadingBtn.classList.remove("listening");
+    
+    // 确保跳过按钮显示并修改文本
+    nextBtn.style.display = "inline-block";
+    nextBtn.textContent = "进入下一关";
+    prevBtn.style.display = "none";
+
+    // 计算当前关卡星级
+    const rate = levelCorrect / 8;
+    let stars = 1;
+    if (rate === 1) stars = 3;
+    else if (rate >= 0.75) stars = 2;
+    levelStars.push(stars);
+
+    const unused = puzzleQuestions.filter(q => !q.used);
+    if (unused.length === 0) {
+      levelCorrect = 0;
+      loadNext();
+      return;
+    }
+    const puzzle = unused[Math.floor(Math.random() * unused.length)];
+    puzzle.used = true;
+    questionEl.textContent = `🎯 关卡挑战：${puzzle.question}`;
+    definitionEl.innerHTML = `本关评分：${"⭐".repeat(stars)}`;
+
+    puzzle.options.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.textContent = opt;
+      btn.className = "option-btn";
+      btn.onclick = () => {
+        if (opt === puzzle.answer) {
+          resultEl.textContent = "🎉 答对了，进入下一关！";
+          correctSound.play();
+          level++;
+          levelCorrect = 0;
+          currentIndex = level * 8;
+          saveProgress();
+          setTimeout(() => {
+            inPuzzle = false;
+            prevBtn.style.display = "inline-block";
+            loadNext();
+          }, 1000);
+        } else {
+          resultEl.textContent = "😥 再试试！";
+          wrongSound.play();
+        }
+      };
+      optionsEl.appendChild(btn);
+    });
+  }
+
+  function showMistakes() {
+    if (wrongList.length === 0) {
+      alert("目前没有错题！");
+      return;
+    }
+    isReviewMode = true;
+    currentReviewIndex = 0;
+    loadNext();
+  }
+
+  function exitReview() {
+    isReviewMode = false;
+    prevBtn.style.display = "inline-block";
+    loadNext();
+  }
+
+  // 重置进度
+  function resetProgress() {
+    if (confirm(`确定要重置"${wordFiles[currentFile].name}"的进度吗？`)) {
+      currentIndex = 0;
+      level = 0;
+      correctCount = 0;
+      wrongList = [];
+      levelStars = [];
+      puzzleQuestions.forEach(q => q.used = false);
+      currentStreak = 0;
+      levelCorrect = 0;
+      // 重置语音识别状态
+      isListening = false;
+      startReadingBtn.textContent = "开始朗读";
+      startReadingBtn.classList.remove("listening");
+      // 清空缓存
+      audioCache = {};
+      saveProgress();
+      loadNext();
+    }
+  }
+
+  // 输入框事件监听
+  function addInputListeners(input) {
+    input.addEventListener('input', handleInput);
+    input.addEventListener('keydown', handleKeyDown);
+    input.addEventListener('compositionstart', () => isComposing = true);
+    input.addEventListener('compositionend', (e) => {
+      isComposing = false;
+      handleInput(e);
+    });
+  }
+
+  let isComposing = false;
+  function handleInput(e) {
+    if (isComposing) return;
+    const input = e.target;
+    input.value = input.value.slice(0, 1).toLowerCase();
+    input.classList.add("correct");
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT') next.focus();
+    
+    autoCheckAnswer();
+  }
+
+function handleKeyDown(e) {
+  if (e.key === "Backspace") {
+    const input = e.target;
+    // 情况1：当前输入框有内容，删除后光标留在当前框
+    if (input.value) {
+      // 删除内容后移除"correct"样式（因为内容已变更）
+      input.value = "";
+      input.classList.remove("correct");
+      e.preventDefault(); // 阻止默认退格行为（避免触发浏览器后退等）
+    } 
+    // 情况2：当前输入框为空，跳转到前一个输入框
+    else {
+      const prev = input.previousElementSibling;
+      if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
+        prev.focus();
+        e.preventDefault(); // 阻止默认行为，避免光标异常跳动
+      }
+    }
+  }
+  // 支持左右方向键切换输入框
+  else if (e.key === "ArrowLeft") {
+    const input = e.target;
+    const prev = input.previousElementSibling;
+    if (prev && prev.tagName === 'INPUT' && prev.classList.contains('letter-input')) {
+      prev.focus();
+      e.preventDefault();
+    }
+  } else if (e.key === "ArrowRight") {
+    const input = e.target;
+    const next = input.nextElementSibling;
+    if (next && next.tagName === 'INPUT' && next.classList.contains('letter-input')) {
+      next.focus();
+      e.preventDefault();
+    }
+  }
+}
+
+  // 初始化游戏
+  initFileSelector();
+  loadFileProgress();
+  initRecognition();
+  loadNext();
+</script>
+</body>
+</html>
