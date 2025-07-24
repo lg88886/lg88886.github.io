@@ -112,6 +112,18 @@
     .review-btn {
       background-color: #9C27B0;
     }
+    .loading-indicator {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -122,6 +134,7 @@
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
+  <audio id="word-audio" controls></audio>
   
   <!-- 新增：文件选择区域 -->
   <div id="fileSelector" style="margin-bottom: 15px;">
@@ -295,6 +308,9 @@
   let recognition; // 语音识别对象
   let isListening = false; // 新增：跟踪语音识别状态
 
+  // 缓存API获取的发音URL，避免重复请求
+  let audioCache = {};
+
   // 标记已使用的谜题
   puzzleQuestions.forEach(q => {
     if (gameData.puzzleQuestionsUsed.includes(puzzleQuestions.indexOf(q))) {
@@ -315,6 +331,7 @@
   const startReadingBtn = document.getElementById("startReadingBtn");
   const deleteFileBtn = document.getElementById("deleteFileBtn");
   const fileNotification = document.getElementById("fileNotification");
+  const wordAudio = document.getElementById("word-audio");
 
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
@@ -901,7 +918,13 @@
     }
   }
 
+  // 使用Free Dictionary API获取并播放单词发音（英音）
   function readWord() {
+    // 停止任何正在播放的语音
+    window.speechSynthesis.cancel();
+    wordAudio.pause();
+    
+    // 获取当前单词
     const currentWords = wordFiles[currentFile].words;
     const word = isReviewMode 
       ? wrongList[currentReviewIndex]?.word 
@@ -909,20 +932,124 @@
       
     if (!word) return;
     
-    // 停止任何正在播放的语音
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(word);
-    utter.lang = "en-US";
-    utter.rate = 0.9;
-    window.speechSynthesis.speak(utter);
+    // 显示加载状态
+    const readButton = document.querySelector('button[onclick="readWord()"]');
+    const originalText = readButton.innerHTML;
+    readButton.innerHTML = '<span class="loading-indicator"></span> 加载中...';
+    readButton.disabled = true;
+    
+    // 先检查缓存
+    if (audioCache[word]) {
+      playAudio(audioCache[word], readButton, originalText);
+      return;
+    }
+    
+    // 调用Free Dictionary API获取发音
+    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`API请求失败: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 查找英音发音
+        let audioUrl = null;
+        
+        // 遍历返回的结果，查找英音发音
+        for (const entry of data) {
+          if (entry.phonetics) {
+            for (const phonetic of entry.phonetics) {
+              // 优先查找明确标记为英式发音的
+              if (phonetic.audio && (phonetic.audio.includes('uk') || !phonetic.audio.includes('us'))) {
+                audioUrl = phonetic.audio;
+                break;
+              }
+            }
+          }
+          if (audioUrl) break;
+        }
+        
+        // 如果找到英音发音
+        if (audioUrl) {
+          // 缓存结果
+          audioCache[word] = audioUrl;
+          playAudio(audioUrl, readButton, originalText);
+        } else {
+          // 未找到发音，回退到浏览器TTS
+          fallbackToTTS(word, readButton, originalText);
+        }
+      })
+      .catch(error => {
+        console.error('获取发音失败:', error);
+        // API调用失败，回退到浏览器TTS
+        fallbackToTTS(word, readButton, originalText);
+      });
+  }
+
+  // 播放音频
+  function playAudio(audioUrl, button, originalText) {
+    wordAudio.src = audioUrl;
+    wordAudio.play()
+      .then(() => {
+        console.log('音频播放成功');
+      })
+      .catch(error => {
+        console.error('音频播放失败:', error);
+        // 音频播放失败，回退到TTS
+        const word = isReviewMode 
+          ? wrongList[currentReviewIndex]?.word 
+          : wordFiles[currentFile].words[currentIndex]?.word;
+        if (word) {
+          fallbackToTTS(word, button, originalText);
+        }
+      })
+      .finally(() => {
+        // 恢复按钮状态
+        button.innerHTML = originalText;
+        button.disabled = false;
+      });
+  }
+
+  // 回退到浏览器TTS
+  function fallbackToTTS(word, button, originalText) {
+    console.log('回退到浏览器TTS播放:', word);
+    
+    // 检查浏览器是否支持TTS
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(word);
+      // 设置为英式英语
+      utterance.lang = 'en-GB';
+      utterance.rate = 0.9;
+      
+      // 播放TTS
+      window.speechSynthesis.speak(utterance);
+      
+      // 监听TTS结束事件
+      utterance.onend = () => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+      };
+      
+      // 监听TTS错误事件
+      utterance.onerror = (event) => {
+        console.error('TTS播放错误:', event.error);
+        resultEl.textContent = "播放失败，请重试";
+        button.innerHTML = originalText;
+        button.disabled = false;
+      };
+    } else {
+      // 浏览器不支持TTS
+      resultEl.textContent = "您的浏览器不支持语音播放";
+      button.innerHTML = originalText;
+      button.disabled = false;
+    }
   }
 
   function showPuzzle() {
     inPuzzle = true;
     letterBox.innerHTML = "";
     optionsEl.innerHTML = "";
-    definitionEl.textContent = "";
-    phoneticEl.textContent = "";
     resultEl.textContent = "";
     startReadingBtn.style.display = "none";
     // 重置语音识别状态
@@ -1010,6 +1137,8 @@
       isListening = false;
       startReadingBtn.textContent = "开始朗读";
       startReadingBtn.classList.remove("listening");
+      // 清空缓存
+      audioCache = {};
       saveProgress();
       loadNext();
     }
@@ -1082,4 +1211,4 @@ function handleKeyDown(e) {
   loadNext();
 </script>
 </body>
-</html>    
+</html>
