@@ -112,17 +112,18 @@
     .review-btn {
       background-color: #9C27B0;
     }
-    .loading-indicator {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,.3);
-      border-radius: 50%;
-      border-top-color: white;
-      animation: spin 1s ease-in-out infinite;
+    .similarity-meter {
+      height: 8px;
+      background-color: #eee;
+      border-radius: 4px;
+      margin: 10px auto;
+      width: 80%;
+      overflow: hidden;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .similarity-fill {
+      height: 100%;
+      background-color: #2196F3;
+      transition: width 0.3s ease;
     }
   </style>
 </head>
@@ -134,7 +135,6 @@
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
-  <audio id="word-audio" controls></audio>
   
   <!-- 新增：文件选择区域 -->
   <div id="fileSelector" style="margin-bottom: 15px;">
@@ -161,6 +161,10 @@
       <button onclick="resetProgress()" class="reset-btn">重置进度</button>
       <button onclick="exitReview()" class="review-btn" style="display:none">返回闯关</button>
       <button onclick="showMistakes()" class="review-btn">📖 查看错题本</button>
+    </div>
+    <!-- 新增：相似度指示器 -->
+    <div class="similarity-meter" id="similarityMeter" style="display:none">
+      <div class="similarity-fill" id="similarityFill"></div>
     </div>
     <div id="options"></div>
     <div id="result"></div>
@@ -278,6 +282,19 @@
     {id: "basic", name: "新概念1词库", filename: "basic_words.txt"},
   ];
 
+  // 常见发音变体映射
+  const pronunciationVariants = {
+    "morning": ["mornin", "mornning"],
+    "afternoon": ["afternun", "afternooon"],
+    "evening": ["evenin", "evenning"],
+    "night": ["nite", "nigh"],
+    "fine": ["fyn", "faine"],
+    "thank": ["thang", "thankyou"],
+    "goodbye": ["goodby", "bye"],
+    "day": ["dai", "dae"],
+    "today": ["toda", "taday"]
+  };
+
   // 单词文件存储
   let wordFiles = {
     "default": { name: "默认单词库", words: defaultWordList, isCustom: false }
@@ -308,9 +325,6 @@
   let recognition; // 语音识别对象
   let isListening = false; // 新增：跟踪语音识别状态
 
-  // 缓存API获取的发音URL，避免重复请求
-  let audioCache = {};
-
   // 标记已使用的谜题
   puzzleQuestions.forEach(q => {
     if (gameData.puzzleQuestionsUsed.includes(puzzleQuestions.indexOf(q))) {
@@ -331,7 +345,8 @@
   const startReadingBtn = document.getElementById("startReadingBtn");
   const deleteFileBtn = document.getElementById("deleteFileBtn");
   const fileNotification = document.getElementById("fileNotification");
-  const wordAudio = document.getElementById("word-audio");
+  const similarityMeter = document.getElementById("similarityMeter");
+  const similarityFill = document.getElementById("similarityFill");
 
   const correctSound = document.getElementById("correct-sound");
   const wrongSound = document.getElementById("wrong-sound");
@@ -595,6 +610,7 @@
     resultEl.textContent = "";
     optionsEl.innerHTML = "";
     letterBox.innerHTML = "";
+    similarityMeter.style.display = "none"; // 隐藏相似度指示器
     updateStats();
     startReadingBtn.style.display = "none";
     // 重置语音识别状态
@@ -785,6 +801,42 @@
     loadNext();
   }
 
+  // 计算字符串相似度（Levenshtein距离算法）
+  function calculateSimilarity(s1, s2) {
+    if (s1 === s2) return 1;
+    if (s1.length === 0 || s2.length === 0) return 0;
+    
+    // 创建矩阵
+    const matrix = [];
+    
+    // 初始化第一列
+    for (let i = 0; i <= s2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    // 初始化第一行
+    for (let j = 0; j <= s1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    // 填充矩阵
+    for (let i = 1; i <= s2.length; i++) {
+      for (let j = 1; j <= s1.length; j++) {
+        const cost = (s1[j-1] === s2[i-1]) ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i-1][j] + 1,    // 插入
+          matrix[i][j-1] + 1,    // 删除
+          matrix[i-1][j-1] + cost // 替换
+        );
+      }
+    }
+    
+    // 计算相似度百分比
+    const distance = matrix[s2.length][s1.length];
+    const maxLength = Math.max(s1.length, s2.length);
+    return 1 - (distance / maxLength);
+  }
+
   // 自动检查答案
   function autoCheckAnswer() {
     if (!checkAllFilled()) return;
@@ -804,13 +856,18 @@
       correctSound.play();
       startReadingBtn.style.display = "inline-block";
     } else {
-      resultEl.textContent = "❌ 拼写错误，请重新填写";
+      // 计算相似度并显示
+      const similarity = calculateSimilarity(userAns, wordObj.word.toLowerCase());
+      similarityMeter.style.display = "block";
+      similarityFill.style.width = `${Math.round(similarity * 100)}%`;
+      
+      if (similarity > 0.7) {
+        resultEl.textContent = `❌ 接近了！（相似度: ${Math.round(similarity * 100)}%）请再试一次`;
+      } else {
+        resultEl.textContent = `❌ 拼写错误（相似度: ${Math.round(similarity * 100)}%），请重新填写`;
+      }
+      
       wrongSound.play();
-      // 清空输入框
-      inputs.forEach(input => {
-        input.value = "";
-      });
-      letterBox.querySelector("input.letter-input")?.focus();
     }
   }
 
@@ -832,6 +889,7 @@
         isListening = false;
         startReadingBtn.textContent = "开始朗读";
         startReadingBtn.classList.remove("listening");
+        similarityMeter.style.display = "none"; // 隐藏相似度指示器
       };
       
       recognition.onerror = function(event) {
@@ -841,6 +899,7 @@
         isListening = false;
         startReadingBtn.textContent = "开始朗读";
         startReadingBtn.classList.remove("listening");
+        similarityMeter.style.display = "none"; // 隐藏相似度指示器
       };
     } else {
       resultEl.textContent = "抱歉，您的浏览器不支持语音识别功能";
@@ -855,8 +914,10 @@
       ? wrongList[currentReviewIndex] 
       : currentWords[currentIndex];
     
-    // 比较识别结果和目标单词
-    if (transcript === wordObj.word.toLowerCase()) {
+    const targetWord = wordObj.word.toLowerCase();
+    
+    // 检查是否完全匹配
+    if (transcript === targetWord) {
       resultEl.textContent = "✅ 朗读正确！正在进入下一题...";
       correctSound.play();
       
@@ -883,10 +944,76 @@
           loadNext();
         }
       }, 1000);
-    } else {
-      resultEl.textContent = `❌ 朗读不正确（你读的是: "${transcript}"），请再试一次`;
-      wrongSound.play();
+      return;
     }
+    
+    // 检查是否是已知的发音变体
+    if (pronunciationVariants[targetWord] && pronunciationVariants[targetWord].includes(transcript)) {
+      resultEl.textContent = `✅ 不错！虽然发音略有不同，但识别到了！正在进入下一题...`;
+      correctSound.play();
+      
+      // 延迟一段时间后自动进入下一题
+      setTimeout(() => {
+        if (isReviewMode) {
+          wrongList.splice(currentReviewIndex, 1);
+          if (wrongList.length === 0) {
+            instructionEl.textContent = "🎉 恭喜你攻克了所有错题！";
+            definitionEl.textContent = "继续加油哦！";
+            phoneticEl.textContent = "";
+            questionEl.textContent = "";
+            return;
+          }
+          loadNext();
+        } else {
+          correctCount++;
+          currentStreak++;
+          levelCorrect++;
+          currentIndex++;
+          saveProgress();
+          loadNext();
+        }
+      }, 1000);
+      return;
+    }
+    
+    // 计算相似度并给出相应反馈
+    const similarity = calculateSimilarity(transcript, targetWord);
+    
+    // 显示相似度指示器
+    similarityMeter.style.display = "block";
+    similarityFill.style.width = `${Math.round(similarity * 100)}%`;
+    
+    if (similarity > 0.7) {
+      resultEl.textContent = `👍 很接近了！（相似度: ${Math.round(similarity * 100)}%）你读的是: "${transcript}"，再试一次！`;
+      // 对于高相似度的情况，给予一定宽容度
+      if (similarity > 0.85) {
+        resultEl.textContent += " （这个发音已经很棒了！）";
+        // 短暂延迟后自动通过
+        setTimeout(() => {
+          resultEl.textContent = "✅ 很棒！系统判定为正确！";
+          correctSound.play();
+          setTimeout(() => {
+            if (isReviewMode) {
+              wrongList.splice(currentReviewIndex, 1);
+              loadNext();
+            } else {
+              correctCount++;
+              currentStreak++;
+              levelCorrect++;
+              currentIndex++;
+              saveProgress();
+              loadNext();
+            }
+          }, 1000);
+        }, 1500);
+      }
+    } else if (similarity > 0.5) {
+      resultEl.textContent = `😐 有点接近（相似度: ${Math.round(similarity * 100)}%）你读的是: "${transcript}"，请再试一次`;
+    } else {
+      resultEl.textContent = `❌ 不太对（相似度: ${Math.round(similarity * 100)}%）你读的是: "${transcript}"，请再仔细听单词发音`;
+    }
+    
+    wrongSound.play();
   }
 
   // 切换语音识别状态（开始/结束）
@@ -903,6 +1030,7 @@
       startReadingBtn.textContent = "开始朗读";
       startReadingBtn.classList.remove("listening");
       resultEl.textContent = "朗读已停止，请重新点击开始朗读";
+      similarityMeter.style.display = "none"; // 隐藏相似度指示器
     } else {
       // 开始语音识别
       try {
@@ -911,6 +1039,7 @@
         startReadingBtn.textContent = "结束朗读";
         startReadingBtn.classList.add("listening");
         resultEl.textContent = "请朗读单词...";
+        similarityMeter.style.display = "none"; // 隐藏相似度指示器
       } catch (e) {
         resultEl.textContent = "无法启动语音识别，请重试";
         console.error('启动语音识别失败:', e);
@@ -918,13 +1047,7 @@
     }
   }
 
-  // 使用Free Dictionary API获取并播放单词发音（英音）
   function readWord() {
-    // 停止任何正在播放的语音
-    window.speechSynthesis.cancel();
-    wordAudio.pause();
-    
-    // 获取当前单词
     const currentWords = wordFiles[currentFile].words;
     const word = isReviewMode 
       ? wrongList[currentReviewIndex]?.word 
@@ -932,130 +1055,27 @@
       
     if (!word) return;
     
-    // 显示加载状态
-    const readButton = document.querySelector('button[onclick="readWord()"]');
-    const originalText = readButton.innerHTML;
-    readButton.innerHTML = '<span class="loading-indicator"></span> 加载中...';
-    readButton.disabled = true;
-    
-    // 先检查缓存
-    if (audioCache[word]) {
-      playAudio(audioCache[word], readButton, originalText);
-      return;
-    }
-    
-    // 调用Free Dictionary API获取发音
-    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`API请求失败: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        // 查找英音发音
-        let audioUrl = null;
-        
-        // 遍历返回的结果，查找英音发音
-        for (const entry of data) {
-          if (entry.phonetics) {
-            for (const phonetic of entry.phonetics) {
-              // 优先查找明确标记为英式发音的
-              if (phonetic.audio && (phonetic.audio.includes('uk') || !phonetic.audio.includes('us'))) {
-                audioUrl = phonetic.audio;
-                break;
-              }
-            }
-          }
-          if (audioUrl) break;
-        }
-        
-        // 如果找到英音发音
-        if (audioUrl) {
-          // 缓存结果
-          audioCache[word] = audioUrl;
-          playAudio(audioUrl, readButton, originalText);
-        } else {
-          // 未找到发音，回退到浏览器TTS
-          fallbackToTTS(word, readButton, originalText);
-        }
-      })
-      .catch(error => {
-        console.error('获取发音失败:', error);
-        // API调用失败，回退到浏览器TTS
-        fallbackToTTS(word, readButton, originalText);
-      });
-  }
-
-  // 播放音频
-  function playAudio(audioUrl, button, originalText) {
-    wordAudio.src = audioUrl;
-    wordAudio.play()
-      .then(() => {
-        console.log('音频播放成功');
-      })
-      .catch(error => {
-        console.error('音频播放失败:', error);
-        // 音频播放失败，回退到TTS
-        const word = isReviewMode 
-          ? wrongList[currentReviewIndex]?.word 
-          : wordFiles[currentFile].words[currentIndex]?.word;
-        if (word) {
-          fallbackToTTS(word, button, originalText);
-        }
-      })
-      .finally(() => {
-        // 恢复按钮状态
-        button.innerHTML = originalText;
-        button.disabled = false;
-      });
-  }
-
-  // 回退到浏览器TTS
-  function fallbackToTTS(word, button, originalText) {
-    console.log('回退到浏览器TTS播放:', word);
-    
-    // 检查浏览器是否支持TTS
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      // 设置为英式英语
-      utterance.lang = 'en-GB';
-      utterance.rate = 0.9;
-      
-      // 播放TTS
-      window.speechSynthesis.speak(utterance);
-      
-      // 监听TTS结束事件
-      utterance.onend = () => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-      };
-      
-      // 监听TTS错误事件
-      utterance.onerror = (event) => {
-        console.error('TTS播放错误:', event.error);
-        resultEl.textContent = "播放失败，请重试";
-        button.innerHTML = originalText;
-        button.disabled = false;
-      };
-    } else {
-      // 浏览器不支持TTS
-      resultEl.textContent = "您的浏览器不支持语音播放";
-      button.innerHTML = originalText;
-      button.disabled = false;
-    }
+    // 停止任何正在播放的语音
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(word);
+    utter.lang = "en-US";
+    utter.rate = 0.9;
+    window.speechSynthesis.speak(utter);
   }
 
   function showPuzzle() {
     inPuzzle = true;
     letterBox.innerHTML = "";
     optionsEl.innerHTML = "";
+    definitionEl.textContent = "";
+    phoneticEl.textContent = "";
     resultEl.textContent = "";
     startReadingBtn.style.display = "none";
     // 重置语音识别状态
     isListening = false;
     startReadingBtn.textContent = "开始朗读";
     startReadingBtn.classList.remove("listening");
+    similarityMeter.style.display = "none"; // 隐藏相似度指示器
     
     // 确保跳过按钮显示并修改文本
     nextBtn.style.display = "inline-block";
@@ -1137,8 +1157,6 @@
       isListening = false;
       startReadingBtn.textContent = "开始朗读";
       startReadingBtn.classList.remove("listening");
-      // 清空缓存
-      audioCache = {};
       saveProgress();
       loadNext();
     }
