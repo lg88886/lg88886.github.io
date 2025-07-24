@@ -295,6 +295,7 @@
     let isListening = false;
     let showFullFirstLetter = false;
     let answerCorrect = false; // 标记答案是否正确
+    let speechSynthAvailable = false; // 语音合成可用状态
 
     // DOM元素
     const [instructionEl, questionEl, resultEl, optionsEl, definitionEl, phoneticEl, letterBox, statsEl] = 
@@ -303,6 +304,7 @@
       ["nextBtn", "prevBtn", "startReadingBtn", "deleteFileBtn", "fileNotification", "similarityMeter", "similarityFill", "streakReward", "rewardMessage"].map(id => document.getElementById(id));
     const [correctSound, wrongSound, rewardSound] = 
       ["correct-sound", "wrong-sound", "reward-sound"].map(id => document.getElementById(id));
+    const readWordBtn = document.querySelector('button[onclick="readWord()"]');
 
     // 初始化
     function init() {
@@ -311,6 +313,20 @@
       updateDeleteButton();
       loadNext();
       initSpeechRecognition();
+      checkSpeechSynthesis();
+    }
+
+    // 检查语音合成支持
+    function checkSpeechSynthesis() {
+      if ('speechSynthesis' in window) {
+        speechSynthAvailable = true;
+        readWordBtn.disabled = false;
+        readWordBtn.title = "";
+      } else {
+        speechSynthAvailable = false;
+        readWordBtn.disabled = true;
+        readWordBtn.title = "您的浏览器不支持语音合成";
+      }
     }
 
     // 更新删除按钮状态
@@ -929,19 +945,40 @@
       }
     }
 
+    // 修复后的语音朗读功能
     function readWord() {
-      // 语音合成（朗读单词）
+      if (!speechSynthAvailable) return;
+      
+      // 停止任何正在进行的语音合成
+      window.speechSynthesis.cancel();
+      
+      // 获取当前单词
       const currentWord = isReviewMode 
         ? wrongList[currentReviewIndex].word
         : wordFiles[currentFile].words[currentIndex].word;
       
+      // 创建语音合成实例
       const utterance = new SpeechSynthesisUtterance(currentWord);
       utterance.lang = 'en-US';
-      speechSynthesis.speak(utterance);
+      utterance.rate = 0.9; // 稍微降低语速，便于学习
+      
+      // 设置朗读完成后的回调
+      utterance.onend = () => {
+        // 可以添加朗读完成后的提示
+        console.log(`朗读完成: ${currentWord}`);
+      };
+      
+      utterance.onerror = (event) => {
+        console.error(`语音合成错误: ${event.error}`);
+        resultEl.textContent = "语音合成出错，请稍后再试";
+      };
+      
+      // 开始朗读
+      window.speechSynthesis.speak(utterance);
     }
 
     // 页面加载完成后初始化游戏
     window.onload = init;
   </script>
 </body>
-</html>
+</html>  
