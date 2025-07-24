@@ -519,6 +519,11 @@
       definitionEl.textContent = `中文提示：${wordObj.definition}`;
       phoneticEl.textContent = `音标：${wordObj.phonetic || '无'}`;
       generateInputBoxes(wordObj);
+	  
+	 // 新增：自动朗读单词
+	  if (speechSynthAvailable) {
+		readWord();
+	  }
     }
 
     // 生成输入框
