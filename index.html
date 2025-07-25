@@ -237,7 +237,7 @@
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
-  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
+  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
 
   <!-- 连续正确提示 -->
   <div id="streakEffect" class="streak-effect"></div>
@@ -522,22 +522,16 @@
       phoneticEl.textContent = `音标：${wordObj.phonetic || '无'}`;
       generateInputBoxes(wordObj);
 	  
-	 // 新增：自动朗读单词
+	  // 新增：自动朗读单词
 	  if (speechSynthAvailable) {
 		readWord();
 	  }
     }
 
-    // 生成输入框
+    // 生成输入框 - 已修改：去除首字母固定显示
     function generateInputBoxes(wordObj) {
-      // 首字母固定显示
-      const firstLetter = document.createElement("div");
-      firstLetter.className = "fixed-letter";
-      firstLetter.textContent = wordObj.word[0].toLowerCase(); // 首字母也显示为小写
-      letterBox.appendChild(firstLetter);
-
-      // 生成剩余输入框
-      for (let i = 1; i < wordObj.word.length; i++) {
+      // 生成所有字母的输入框（包括首字母）
+      for (let i = 0; i < wordObj.word.length; i++) {
         const input = document.createElement("input");
         input.type = "text";
         input.maxLength = 1;
@@ -589,7 +583,7 @@
       
       // 获取用户输入（确保全部转为小写）
       const inputs = letterBox.querySelectorAll("input");
-      let userAnswer = currentWord.word[0].toLowerCase();
+      let userAnswer = "";
       inputs.forEach(input => userAnswer += (input.value || '').toLowerCase());
 
       // 检查是否填满
@@ -606,7 +600,7 @@
 
       // 标记输入框状态
       inputs.forEach((input, i) => {
-        const correctChar = currentWord.word[i + 1].toLowerCase();
+        const correctChar = currentWord.word[i].toLowerCase();
         input.className = `word-input ${input.value.toLowerCase() === correctChar ? 'correct' : 'wrong'}`;
       });
 
@@ -616,6 +610,8 @@
         resultEl.textContent = `🎉 正确！单词：${currentWord.word}`;
         correctSound.play();
         answerCorrect = true;
+        continueBtn.style.display = "inline-block";
+        nextBtn.style.display = "none";
         
         // 提示用户朗读单词
         setTimeout(() => {
@@ -637,7 +633,7 @@
         setTimeout(() => {
           const inputs = letterBox.querySelectorAll("input");
           inputs.forEach((input, i) => {
-            const correctChar = currentWord.word[i + 1].toLowerCase();
+            const correctChar = currentWord.word[i].toLowerCase();
             if (input.value.toLowerCase() !== correctChar) {
               input.classList.add('highlight');
             }
@@ -679,13 +675,14 @@
         correctCount++;
         currentStreak++;
         levelCorrect++;
-        currentIndex++;
         
         // 检查连续正确奖励
         if (streakRewards[currentStreak]) {
           showReward(currentStreak);
           return;
         }
+        
+        currentIndex++;
       }
       loadNext();
     }
