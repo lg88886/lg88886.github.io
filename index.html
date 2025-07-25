@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>单词拼写游戏V3.3 - 按课时学习</title>
+  <title>单词拼写游戏V3.4 - 按课时学习</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <script>
@@ -132,6 +132,18 @@
       .stats-badge {
         @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
       }
+      .reward-card {
+        @apply bg-gradient-to-br from-yellow-100 to-orange-100 rounded-xl p-4 border border-yellow-200 shadow-lg transition-all duration-500 animate-fade-in;
+      }
+      .listening {
+        background-color: #ef4444 !important;
+      }
+      #similarityMeter {
+        transition: all 0.3s ease;
+      }
+      .word-input.highlight {
+        animation: highlight 1s ease;
+      }
     }
   </style>
 </head>
@@ -144,6 +156,7 @@
       </h1>
       <p class="text-gray-600 text-base sm:text-lg">提升你的英语词汇量！</p>
     </div>
+
 
     <!-- 游戏主容器 -->
     <div class="bg-white rounded-xl p-5 sm:p-6 shadow-lg mb-6 animate-fade-in">
@@ -177,8 +190,6 @@
         
         <!-- 操作按钮区域 -->
         <div class="flex flex-wrap gap-2 mb-2">
-
-          
           <!-- 课时统计信息 -->
           <div id="lessonStats" class="flex-1 flex items-center justify-center sm:justify-end text-sm text-gray-600">
             <span id="statsInfo" class="hidden sm:inline-flex items-center">
@@ -194,6 +205,7 @@
         <div id="fileNotification" class="mt-1 text-sm text-gray-600"></div>
       </div>
 
+
       <!-- 游戏内容区域 -->
       <div id="content" class="space-y-5">
         <!-- 关卡和题目信息 -->
@@ -202,6 +214,7 @@
           <div id="stats" class="flex flex-wrap gap-2 text-sm text-gray-600"></div>
         </div>
 
+
         <!-- 单词信息 -->
         <div class="bg-blue-50 rounded-lg p-4 mb-5 animate-slide-up" style="animation-delay: 0.1s">
           <div id="question" class="text-base font-medium text-gray-800 mb-2"></div>
@@ -209,10 +222,12 @@
           <div id="phonetic" class="text-base text-indigo-500 italic"></div>
         </div>
 
+
         <!-- 单词输入区域 -->
         <div class="flex justify-center mb-5 animate-slide-up" style="animation-delay: 0.2s">
           <div id="letterBox" class="flex gap-2 flex-wrap justify-center"></div>
         </div>
+
 
         <!-- 操作按钮 - 移动端优化布局 -->
         <div class="mb-5 animate-slide-up" style="animation-delay: 0.3s">
@@ -236,9 +251,9 @@
             <button onclick="submitAnswer()" id="nextBtn" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400">
               跳过此题 <i class="fa fa-arrow-right ml-1"></i>
             </button>
-		    <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none min-w-[120px]">
-            <i class="fa fa-refresh mr-1"></i> 重置进度
-          </button>
+            <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none min-w-[120px]">
+              <i class="fa fa-refresh mr-1"></i> 重置进度
+            </button>
             <button onclick="exitReview()" class="game-btn bg-green-500 text-white focus:ring-green-500" style="display:none">
               <i class="fa fa-arrow-left mr-1"></i> 返回闯关
             </button>
@@ -248,16 +263,20 @@
           </div>
         </div>
 
+
         <!-- 相似度指示器 -->
         <div id="similarityMeter" class="progress-bar mb-5 animate-slide-up" style="animation-delay: 0.4s; display: none">
           <div class="progress-fill bg-primary" id="similarityFill"></div>
         </div>
 
+
         <!-- 选项区域 -->
         <div id="options" class="space-y-2 animate-slide-up" style="animation-delay: 0.5s"></div>
 
+
         <!-- 结果区域 -->
         <div id="result" class="mt-4 p-4 rounded-lg text-center font-medium animate-slide-up" style="animation-delay: 0.6s"></div>
+
 
         <!-- 连续正确奖励区域 -->
         <div id="streakReward" class="hidden reward-card mt-5">
@@ -272,11 +291,13 @@
       </div>
     </div>
 
+
     <!-- 底部信息 -->
     <div class="text-center text-gray-500 text-sm mt-6 animate-fade-in">
-      <p>单词拼写游戏 V3.3 ©___在路上 | 系统学习英语词汇</p>
+      <p>单词拼写游戏 V3.4 ©___在路上 | 系统学习英语词汇</p>
     </div>
   </div>
+
 
   <!-- 音频元素 -->
   <audio id="bgm" autoplay loop>
@@ -286,8 +307,10 @@
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
   <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
 
+
   <!-- 连续正确提示 -->
   <div id="streakEffect" class="streak-effect"></div>
+
 
   <script>
     // 按课时组织的核心单词库
@@ -352,6 +375,7 @@
       }
     };
 
+
     // 关卡谜题（扩展到33题）
     const puzzleQuestions = [
       { question: "“日出大米”猜一个字？", options: ["明", "昌", "早", "亮"], answer: "昌" },
@@ -389,91 +413,18 @@
       { question: "“一人一张口，下面长只手”猜一个字？", options: ["拿", "合", "哈", "答"], answer: "拿" },
       { question: "什么东西没脚走天下？", options: ["船", "蛇", "路", "邮票"], answer: "邮票" },
       {question: "什么东西越洗越脏？", options: ["衣服", "手", "水", "地板"], answer: "水"}
-		{question: "哪种狗不会叫？", options: ["热狗", "藏獒", "哈士奇", "牧羊犬"], answer: "热狗"}
-		{question: "什么东西有头却没有脚？", options: ["人", "蛇", "床", "鱼"], answer: "床"}
-		{question: "小明从楼上掉下来却没受伤，为什么？", options: ["他是机器人", "他掉的是楼梯", "他梦见的", "他太胖了"], answer: "他梦见的"}
-		{question: "哪种水果最怕冷？", options: ["西瓜", "香蕉", "梨", "冻柿"], answer: "冻柿"}
-		{question: "什么地方开车不用担心车祸？", options: ["操场", "沙漠", "地图上", "停车场"], answer: "地图上"}
-		{question: "什么人最爱说话却不算话？", options: ["骗子", "哑巴", "演员", "主持人"], answer: "哑巴"}
-		{question: "什么东西可以跑却没有腿？", options: ["车", "影子", "水", "风"], answer: "水"}
-		{question: "小王的爸爸有三个儿子：大儿子叫大毛，二儿子叫二毛，三儿子叫什么？", options: ["小毛", "三毛", "小王", "毛毛"], answer: "小王"}
-		{question: "哪种书最不靠谱？", options: ["小说", "参考书", "天书", "漫画"], answer: "天书"}
-		{question: "什么门永远关不上？", options: ["车门", "家门", "铁门", "球门"], answer: "球门"}
-		{question: "为什么熊冬眠时不怕冷？", options: ["因为它有毛", "躲在洞里", "不觉得冷", "因为是动画里的"], answer: "不觉得冷"}
-		{question: "什么东西越扔越大？", options: ["石头", "影子", "气球", "纸"], answer: "气球"}
-		{question: "小明的妈妈有三个儿子，大儿子叫大明，二儿子叫二明，第三个叫什么？", options: ["三明", "小明", "明明", "不明"], answer: "小明"}
-		{question: "哪种马不能跑？", options: ["木马", "种马", "赛马", "骏马"], answer: "木马"}
-		{question: "一头牛4条腿，一只羊4条腿，三只羊和一头牛一共有多少条腿？", options: ["14", "16", "18", "20"], answer: "16"}
-		{question: "什么鱼不会游泳？", options: ["鲨鱼", "金鱼", "死鱼", "磁鱼"], answer: "死鱼"}
-		{question: "哪一种花永远不开？", options: ["玫瑰", "太阳花", "死花", "雏菊"], answer: "死花"}
-		{question: "一只手表最多有几个指针？", options: ["1个", "2个", "3个", "4个"], answer: "3个"}
-		{question: "太阳从哪个方向升起？", options: ["南", "北", "东", "西"], answer: "东"}
-		{question: "钟表在走动时人们常说它在“走路”，这种说法形容的是？", options: ["跑步", "转圈", "走路", "跳舞"], answer: "走路"}
-		{question: "什么水永远用不完？", options: ["河水", "井水", "海水", "泪水"], answer: "海水"}
-		{question: "什么东西买的人知道，卖的人知道，只有用的人不知道？", options: ["药", "棺材", "烟", "鞋"], answer: "棺材"}
-		{question: "哪一种字人人见了都会念错？", options: ["谜", "难", "错", "不会"], answer: "错"}
-		{question: "有一种鸟不会飞，它是什么？", options: ["企鹅", "鸵鸟", "鸡", "鸭"], answer: "企鹅"}
-		{question: "什么杯子不能装水？", options: ["茶杯", "酒杯", "温度计", "塑料杯"], answer: "温度计"}
-		{question: "什么样的路不能走？", options: ["硬路", "田字路", "人行道", "棋盘路"], answer: "棋盘路"}
-		{question: "一个人连续跳了10次，最后还站在原地，这是为什么？", options: ["他在原地跳", "他没动", "他跳的是原地跳", "他在打转"], answer: "他在原地跳"}
-		{question: "什么东西打碎了人们不会哭？", options: ["玻璃", "心", "蛋", "糖"], answer: "蛋"}
-		{question: "哪种门永远打不开？", options: ["糖门", "木门", "电脑门", "虚拟门"], answer: "虚拟门"}
-		{question: "有个人一年只工作一天，猜是哪个节日？", options: ["春节", "国庆", "愚人节", "劳动节"], answer: "愚人节"}
-		{question: "什么东西你想打破它，却不能真正打破？", options: ["铁", "玻璃", "沉默", "树枝"], answer: "沉默"}
-		{question: "什么东西从来不会说谎？", options: ["镜子", "钟", "书", "雨"], answer: "镜子"}
-		{question: "小李把一颗星星摘下来装进口袋，为什么？", options: ["他是魔法师", "天黑前", "只是比喻", "因为有夜明珠"], answer: "只是比喻"}
-		{question: "哪种杯子永远也喝不到水？", options: ["茶杯", "咖啡杯", "冠军杯", "塑料杯"], answer: "冠军杯"}
-		{question: "什么东西越藏越多？", options: ["钱", "秘密", "问题", "谎言"], answer: "谎言"}
-		{question: "哪种动物最喜欢自拍？", options: ["猴子", "大象", "袋鼠", "斑马"], answer: "猴子"}
-		{question: "什么东西买的人知道，卖的人知道，用的人却不知道？", options: ["手机", "棺材", "书", "车"], answer: "棺材"}
-		{question: "什么东西没人见过，却存在？", options: ["幽灵", "未来", "想象", "空气"], answer: "未来"}
-		{question: "什么东西能让人看见别人，却看不见自己？", options: ["眼睛", "照片", "镜子", "影子"], answer: "镜子"}
-		{question: "哪种书本打开后没有纸？", options: ["小说", "电子书", "空白书", "字典"], answer: "电子书"}
-		{question: "什么东西到了晚上比白天高？", options: ["影子", "温度", "星星", "月亮"], answer: "影子"}
-		{question: "什么样的手永远抓不到东西？", options: ["空手", "影子", "假手", "大手"], answer: "影子"}
-		{question: "什么东西越用越多，越不用越少？", options: ["钱", "食物", "知识", "经验"], answer: "知识"}
-		{question: "一个人身上有四个角，是什么人？", options: ["警察", "疯子", "图纸上的人", "画中人"], answer: "图纸上的人"}
-		{question: "什么东西永远不会被脚踢掉？", options: ["足球", "影子", "气球", "云"], answer: "影子"}
-		{question: "什么东西不管用多久都不会过期？", options: ["牛奶", "手机", "知识", "水果"], answer: "知识"}
-		{question: "桌子上有四个苹果，你拿走一个，还剩几个？", options: ["3", "4", "5", "0"], answer: "4"}
-		{question: "什么钥匙打不开门？", options: ["锁匙", "琴键", "车匙", "房匙"], answer: "琴键"}
-		{question: "什么东西总是在你前面，却永远看不见？", options: ["未来", "影子", "道路", "梦想"], answer: "未来"}
-		{question: "什么东西放在口袋里，越拿越轻？", options: ["钱", "石头", "空", "羽毛"], answer: "空"}
-		{question: "有个人从飞机上跳下却没有受伤，为什么？", options: ["他开伞了", "他只是跳梦里", "他在梦里", "他是超人"], answer: "他在梦里"}
-		{question: "什么书永远没人读？", options: ["小说", "台历", "日记", "休闲书"], answer: "台历"}
-		{question: "什么样的桌子永远在转？", options: ["转桌", "晃桌", "摇桌", "风桌"], answer: "转桌"}
-		{question: "哪种手机永远不会响？", options: ["智能手机", "旧手机", "坏手机", "模型手机"], answer: "模型手机"}
-		{question: "什么东西一旦说出口就会消失？", options: ["秘密", "沉默", "空气", "笑声"], answer: "沉默"}
-		{question: "什么车没有轮子也能跑？", options: ["玩具车", "思维车", "梦中车", "风车"], answer: "风车"}
-		{question: "飞机飞行时最怕遇到什么？", options: ["小鸟", "风", "雷", "雾"], answer: "雾"}
-		{question: "什么东西一说出来就会消失？", options: ["秘密", "沉默", "时间", "回声"], answer: "沉默"}
-		{question: "什么动物最擅长表演？", options: ["猴子", "狗", "猫", "鱼"], answer: "猴子"}
-		{question: "哪个字永远写不对？", options: ["错", "对", "爱", "好"], answer: "错"}
-		{question: "什么东西你明知道不是真的，却还常常看到？", options: ["梦", "幻影", "影子", "影像"], answer: "幻影"}
-		{question: "什么东西比天还高？", options: ["山", "云", "楼", "梦想"], answer: "梦想"}
-		{question: "哪种鱼最会跳舞？", options: ["跳鱼", "金鱼", "海马", "鲨鱼"], answer: "跳鱼"}
-		{question: "什么东西不会掉毛？", options: ["猫", "兔子", "人", "光头"], answer: "光头"}
-		{question: "哪个月是所有月份中最短的？", options: ["一月", "二月", "三月", "四月"], answer: "二月"}
-		{question: "什么东西越分越多？", options: ["钱", "蛋糕", "情感", "笑容"], answer: "笑容"}
-		{question: "什么动物最爱逛超市？", options: ["狗", "猫", "熊", "猴子"], answer: "熊"}
-		{question: "什么东西永远不会说话？", options: ["书", "影子", "石头", "钟表"], answer: "石头"}
-		{question: "有一种车永远不需要加油，这是什么车？", options: ["电动车", "自行车", "玩具车", "风车"], answer: "自行车"}
-		{question: "哪种门从来都打不开？", options: ["校门", "房门", "天门", "围棋门"], answer: "天门"}
-		{question: "什么东西明明是绿色的，却看不见？", options: ["树", "叶子", "隐形绿", "不见的绿"], answer: "隐形绿"}
-		{question: "什么东西在你触碰时会破裂？", options: ["蛋", "气球", "纸", "水"], answer: "气球"}
-		{question: "什么东西是用来给别人看的，却永远看不见自己的？", options: ["镜子", "照片", "眼睛", "画"], answer: "镜子"}
-		{question: "哪种书打开后没有纸？", options: ["小说", "电子书", "空白书", "日记"], answer: "电子书"}
-		{question: "什么东西每天都在增加，但用的时候却变少？", options: ["烦恼", "问题", "年龄", "回忆"], answer: "问题"}
-		{question: "什么东西一旦失去了就再也找不回来？", options: ["时间", "金钱", "青春", "机会"], answer: "时间"}
-		{question: "哪种动物开会最有效率？", options: ["狮子", "蚂蚁", "蜜蜂", "乌龟"], answer: "蜜蜂"}
-		{question: "什么东西不吃饭也能活？", options: ["人", "植物", "动物", "鱼"], answer: "植物"}
-		{question: "什么钟永远不会迟到？", options: ["闹钟", "手表", "挂钟", "电钟"], answer: "闹钟"}
-		{question: "什么东西买了以后才会知道真相？", options: ["抽奖", "保险", "谎言", "轮胎"], answer: "谎言"}
-		{question: "什么东西一提就让人忘记烦恼？", options: ["笑", "泪", "怒", "忙"], answer: "笑"}
-		{question: "什么东西越躲越显眼？", options: ["秘密", "谎言", "影子", "笑容"], answer: "谎言"}
-		{question: "什么东西一旦失去就永远回不来了？", options: ["金钱", "时间", "爱情", "青春"], answer: "时间"} 
-		{question: "什么东西人们都不喜欢吃？", options: ["糖", "亏", "饼干", "巧克力"], answer: "亏"}
     ];
+
+
+    // 奖励谜题（连续答对5题时使用）
+    const rewardPuzzles = [
+      { question: "什么水果有视力问题？", options: ["苹果", "香蕉", "芒果", "葡萄"], answer: "芒果" },
+      { question: "什么东西有头无颈？", options: ["酒瓶", "铅笔", "石头", "桌子"], answer: "酒瓶" },
+      { question: "什么东西人们在不停地吃它，却永远吃不饱？", options: ["空气", "水", "零食", "知识"], answer: "空气" },
+      { question: "什么东西能加不能减？", options: ["年龄", "体重", "金钱", "分数"], answer: "年龄" },
+      { question: "什么东西越生气，它就越大？", options: ["脾气", "气球", "火焰", "海浪"], answer: "脾气" }
+    ];
+
 
     // 发音变体（用于容错）
     const pronunciationVariants = {
@@ -482,6 +433,7 @@
       "evening": ["evenin", "evenning"],
       "hello": ["hallo", "hellow"],
     };
+
 
     // 连续正确奖励配置
     const streakRewards = {
@@ -494,13 +446,15 @@
         }
       },
       5: {
-        description: "跳过一个单词",
+        description: "挑战奖励谜题赢取额外积分！",
         action: () => {
-          currentIndex++;
-          return "已自动跳过下一个单词！";
+          // 触发奖励谜题
+          showRewardPuzzle();
+          return "完成谜题获得额外奖励！";
         }
       }
     };
+
 
     // 游戏核心变量
     let currentFile = "default";
@@ -512,9 +466,11 @@
       puzzleQuestionsUsed: {} // 按文件保存已使用的谜题 {file: [indices]}
     };
 
+
     // 内存变量
     let { currentIndex, lessonStars, wrongList, puzzleQuestionsUsed } = gameData;
     let inPuzzle = false;
+    let inRewardPuzzle = false; // 新增：标记是否在奖励谜题中
     let isReviewMode = false;
     let currentStreak = 0;
     let currentReviewIndex = 0;
@@ -522,6 +478,8 @@
     let isListening = false;
     let answerCorrect = false; // 标记答案是否正确
     let speechSynthAvailable = false; // 语音合成可用状态
+    let rewardPuzzleIndex = -1; // 记录当前奖励谜题索引
+
 
     // DOM元素缓存
     const dom = {
@@ -548,6 +506,7 @@
       lessonSelect: document.getElementById("lessonSelect")
     };
 
+
     // 初始化
     function init() {
       // 初始化事件监听
@@ -559,6 +518,7 @@
       initSpeechRecognition();
       checkSpeechSynthesis();
     }
+
 
     // 检查语音合成支持
     function checkSpeechSynthesis() {
@@ -573,6 +533,7 @@
       }
     }
 
+
     // 加载单词文件
     function loadSelectedWordFile() {
       const selectedFile = document.getElementById("wordFileSelect").value;
@@ -584,11 +545,11 @@
       
       const file = lessonWordLists[currentFile];
 	  
-	 // 新增：切换文件时重置当前课时ID
-	  if (file.lessons.length > 0) {
-		currentLessonId = file.lessons[0].id;
-		currentIndex = 0;
-	  }
+      // 新增：切换文件时重置当前课时ID
+      if (file.lessons.length > 0) {
+        currentLessonId = file.lessons[0].id;
+        currentIndex = 0;
+      }
       
       // 初始化当前文件的错题列表（如果不存在）
       if (!wrongList[currentFile]) {
@@ -615,6 +576,7 @@
         "threesh": "threeshang_words.txt",
         "basic": "basic_words.txt"
       }[currentFile];
+
 
       // 读取并解析带课时的TXT文件
       fetch(fileName)
@@ -647,6 +609,7 @@
         });
     }
 
+
     // 解析带课时的词库文件
 function parseLessonFile(text) {
   const lessons = [];
@@ -654,10 +617,12 @@ function parseLessonFile(text) {
   let currentLessonId = 1;
   let currentLessonName = `第${currentLessonId}课`;
 
+
   // 按行分割，过滤空行和无效行
   const lines = text.split('\n')
     .map(line => line.trim())
     .filter(line => line && !line.startsWith('//')); // 忽略注释行
+
 
   lines.forEach(line => {
     // 检测课时分隔符（支持"LessonX"和"LessonX:XXXXXX"两种格式）
@@ -694,13 +659,16 @@ function parseLessonFile(text) {
     }
   });
 
+
   // 添加最后一个课时
   if (currentLesson.words.length > 0) {
     lessons.push(currentLesson);
   }
 
+
   return lessons;
 }
+
 
     // 更新课时选择器
     function updateLessonSelector() {
@@ -731,6 +699,7 @@ function parseLessonFile(text) {
       loadCurrentLesson();
     }
 
+
     // 切换课时
     function changeLesson() {
       const selectedLessonId = parseInt(dom.lessonSelect.value);
@@ -747,6 +716,7 @@ function parseLessonFile(text) {
       loadCurrentLesson();
     }
 
+
     // 更新统计信息
     function updateStats() {
       const file = lessonWordLists[currentFile];
@@ -762,6 +732,7 @@ function parseLessonFile(text) {
       `;
     }
 
+
     // 获取当前课时的正确单词数
     function getCorrectCount() {
       const lesson = getCurrentLesson();
@@ -773,11 +744,13 @@ function parseLessonFile(text) {
              lessonWords.slice(0, currentIndex).filter(word => wrongWords.includes(word)).length;
     }
 
+
     // 获取当前课时
     function getCurrentLesson() {
       return lessonWordLists[currentFile].lessons.find(lesson => lesson.id === currentLessonId) || 
              lessonWordLists[currentFile].lessons[0];
     }
+
 
     // 加载当前课时内容
     function loadCurrentLesson() {
@@ -837,7 +810,7 @@ function parseLessonFile(text) {
       document.querySelector('button[onclick="exitReview()"]').style.display = "none";
       
       // 检查是否需要显示谜题（完成课时后）
-      if (currentIndex >= lesson.words.length && !inPuzzle) {
+      if (currentIndex >= lesson.words.length && !inPuzzle && !inRewardPuzzle) {
         showPuzzle();
         return;
       }
@@ -861,6 +834,7 @@ function parseLessonFile(text) {
       dom.nextBtn.textContent = isReviewMode ? "下一个错题" : "跳过此题";
       dom.prevBtn.disabled = isReviewMode ? currentReviewIndex <= 0 : currentIndex <= 0;
     }
+
 
     // 生成输入框
     function generateInputBoxes(wordObj) {
@@ -888,6 +862,7 @@ function parseLessonFile(text) {
       dom.letterBox.querySelector("input")?.focus();
     }
 
+
     // 输入框事件监听
     function addInputListeners(input) {
       // 输入后自动跳到下一个
@@ -902,6 +877,7 @@ function parseLessonFile(text) {
         }
       });
 
+
       // 退格键处理
       input.addEventListener('keydown', function(e) {
         if (e.key === 'Backspace' && !this.value) {
@@ -912,6 +888,7 @@ function parseLessonFile(text) {
         }
       });
     }
+
 
     // 检查答案
     function checkAnswer() {
@@ -927,23 +904,28 @@ function parseLessonFile(text) {
       let userAnswer = "";
       inputs.forEach(input => userAnswer += (input.value || '').toLowerCase());
 
+
       // 检查是否填满
       if (userAnswer.length !== wordObj.word.length) return;
+
 
       // 相似度计算
       dom.similarityMeter.style.display = "block";
       const similarity = calculateSimilarity(userAnswer, wordObj.word.toLowerCase());
       dom.similarityFill.style.width = `${similarity * 100}%`;
 
+
       // 判断对错
       const isCorrect = userAnswer === wordObj.word.toLowerCase() || 
         (pronunciationVariants[wordObj.word.toLowerCase()]?.includes(userAnswer) ?? false);
+
 
       // 标记输入框状态
       inputs.forEach((input, i) => {
         const correctChar = wordObj.word[i].toLowerCase();
         input.className = `word-input ${input.value.toLowerCase() === correctChar ? 'correct' : 'wrong'}`;
       });
+
 
       // 处理结果
       if (isCorrect) {
@@ -977,6 +959,7 @@ function parseLessonFile(text) {
           wrongList[currentFile].push(wordObj);
         }
 
+
         // 高亮错误字母1秒后清空
         setTimeout(() => {
           const inputs = dom.letterBox.querySelectorAll("input");
@@ -1004,6 +987,7 @@ function parseLessonFile(text) {
       updateStats();
     }
 
+
     // 显示连续正确效果
     function showStreakEffect() {
       const streakEl = document.getElementById("streakEffect");
@@ -1013,6 +997,7 @@ function parseLessonFile(text) {
         streakEl.style.display = "none";
       }, 1000);
     }
+
 
     // 下一题处理
     function nextQuestion() {
@@ -1031,7 +1016,7 @@ function parseLessonFile(text) {
       
       // 检查是否完成当前课时
       const lesson = getCurrentLesson();
-      if (currentIndex >= lesson.words.length && !inPuzzle) {
+      if (currentIndex >= lesson.words.length && !inPuzzle && !inRewardPuzzle) {
         // 显示谜题
         showPuzzle();
       } else {
@@ -1039,6 +1024,7 @@ function parseLessonFile(text) {
         loadCurrentLesson();
       }
     }
+
 
     // 上一题
     function prevQuestion() {
@@ -1055,6 +1041,7 @@ function parseLessonFile(text) {
       loadCurrentLesson();
     }
 
+
     // 跳过当前题
     function submitAnswer() {
       if (isReviewMode) {
@@ -1062,6 +1049,7 @@ function parseLessonFile(text) {
         loadCurrentLesson();
         return;
       }
+
 
       if (inPuzzle) {
         // 谜题跳过，进入下一课
@@ -1080,6 +1068,14 @@ function parseLessonFile(text) {
         loadCurrentLesson();
         return;
       }
+      
+      // 奖励谜题跳过
+      if (inRewardPuzzle) {
+        inRewardPuzzle = false;
+        nextQuestion();
+        return;
+      }
+
 
       // 正常题跳过（加入错题）
       const lesson = getCurrentLesson();
@@ -1096,7 +1092,8 @@ function parseLessonFile(text) {
       loadCurrentLesson();
     }
 
-    // 显示谜题
+
+    // 显示课时完成谜题
     function showPuzzle() {
       inPuzzle = true;
       const lesson = getCurrentLesson();
@@ -1120,6 +1117,7 @@ function parseLessonFile(text) {
       const puzzle = availablePuzzles[puzzleIndex];
       puzzleQuestionsUsed[currentFile].push(puzzleQuestions.indexOf(puzzle));
 
+
       // 显示谜题
       dom.instruction.innerHTML = `<span class="level-badge">${lesson.name} 完成挑战</span> 恭喜完成本课时，来挑战一个小谜题吧！`;
       dom.question.textContent = puzzle.question;
@@ -1127,18 +1125,50 @@ function parseLessonFile(text) {
       dom.phonetic.textContent = "";
       dom.letterBox.innerHTML = "";
 
+
       // 生成选项
       puzzle.options.forEach(option => {
         const btn = document.createElement("button");
         btn.className = "game-btn bg-gray-200 text-gray-700 w-full text-left mb-2";
         btn.textContent = option;
-        btn.onclick = () => checkPuzzleAnswer(puzzle, option);
+        btn.onclick = () => checkPuzzleAnswer(puzzle, option, false);
         dom.options.appendChild(btn);
       });
     }
 
-    // 检查谜题答案
-    function checkPuzzleAnswer(puzzle, selected) {
+
+    // 显示连续答对奖励谜题（新增功能）
+    function showRewardPuzzle() {
+      inRewardPuzzle = true;
+      const lesson = getCurrentLesson();
+      
+      // 随机选择一个奖励谜题
+      rewardPuzzleIndex = Math.floor(Math.random() * rewardPuzzles.length);
+      const puzzle = rewardPuzzles[rewardPuzzleIndex];
+
+
+      // 显示谜题
+      dom.instruction.innerHTML = `<span class="level-badge">🎉 连续答对奖励</span> 恭喜连续答对5题！来挑战一个奖励谜题吧！`;
+      dom.question.textContent = puzzle.question;
+      dom.definition.textContent = "请选择正确答案：";
+      dom.phonetic.textContent = "";
+      dom.letterBox.innerHTML = "";
+      dom.streakReward.classList.add("hidden");
+
+
+      // 生成选项
+      puzzle.options.forEach(option => {
+        const btn = document.createElement("button");
+        btn.className = "game-btn bg-yellow-200 text-yellow-800 w-full text-left mb-2";
+        btn.textContent = option;
+        btn.onclick = () => checkPuzzleAnswer(puzzle, option, true);
+        dom.options.appendChild(btn);
+      });
+    }
+
+
+    // 检查谜题答案（修改为支持奖励谜题）
+    function checkPuzzleAnswer(puzzle, selected, isRewardPuzzle) {
       const buttons = dom.options.querySelectorAll("button");
       buttons.forEach(btn => {
         btn.disabled = true;
@@ -1149,46 +1179,68 @@ function parseLessonFile(text) {
         }
       });
 
+
       // 处理结果
       if (selected === puzzle.answer) {
         dom.result.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
-        dom.result.textContent = "🎉 恭喜你答对了！获得额外星星！";
+        dom.result.textContent = "🎉 恭喜你答对了！获得额外奖励！";
         dom.correctSound.play();
         
         // 奖励星星
         lessonStars[currentFile] = lessonStars[currentFile] || {};
         lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
+        
+        // 奖励谜题完成后继续当前课时
+        if (isRewardPuzzle) {
+          setTimeout(() => {
+            inRewardPuzzle = false;
+            nextQuestion();
+          }, 2000);
+        }
       } else {
         dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
         dom.result.textContent = `❌ 正确答案是：${puzzle.answer}`;
         dom.wrongSound.play();
+        
+        // 奖励谜题答错也继续当前课时
+        if (isRewardPuzzle) {
+          setTimeout(() => {
+            inRewardPuzzle = false;
+            nextQuestion();
+          }, 2000);
+        }
       }
+
 
       // 保存进度
       saveCurrentProgress();
       
-      // 2秒后进入下一课
-      setTimeout(() => {
-        const lessons = lessonWordLists[currentFile].lessons;
-        const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
-        
-        // 进入下一课
-        if (currentLessonIndex + 1 < lessons.length) {
-          currentLessonId = lessons[currentLessonIndex + 1].id;
-        } else {
-          // 如果是最后一课，循环到第一课时
-          currentLessonId = lessons[0].id;
-          dom.result.textContent += " 恭喜你完成了所有课时！将从第一课时重新开始。";
-        }
-        
-        currentIndex = 0;
-        inPuzzle = false;
-        loadCurrentLesson();
-        
-        // 更新课时选择器
-        dom.lessonSelect.value = currentLessonId;
-      }, 2000);
+      // 非奖励谜题（课时完成谜题）的处理
+      if (!isRewardPuzzle) {
+        // 2秒后进入下一课
+        setTimeout(() => {
+          const lessons = lessonWordLists[currentFile].lessons;
+          const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
+          
+          // 进入下一课
+          if (currentLessonIndex + 1 < lessons.length) {
+            currentLessonId = lessons[currentLessonIndex + 1].id;
+          } else {
+            // 如果是最后一课，循环到第一课时
+            currentLessonId = lessons[0].id;
+            dom.result.textContent += " 恭喜你完成了所有课时！将从第一课时重新开始。";
+          }
+          
+          currentIndex = 0;
+          inPuzzle = false;
+          loadCurrentLesson();
+          
+          // 更新课时选择器
+          dom.lessonSelect.value = currentLessonId;
+        }, 2000);
+      }
     }
+
 
     // 语音识别初始化
     function initSpeechRecognition() {
@@ -1198,10 +1250,12 @@ function parseLessonFile(text) {
         return;
       }
 
+
       recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
       recognition.lang = 'en-US';
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
+
 
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript.toLowerCase();
@@ -1216,6 +1270,7 @@ function parseLessonFile(text) {
         const isMatch = variants.some(variant => 
           transcript.includes(variant) || variant.includes(transcript)
         );
+
 
         // 处理识别结果
         if (isMatch) {
@@ -1239,12 +1294,14 @@ function parseLessonFile(text) {
         }
       };
 
+
       recognition.onend = () => {
         isListening = false;
         dom.startReadingBtn.textContent = "开始朗读";
         dom.startReadingBtn.classList.remove("listening");
       };
     }
+
 
     // 切换语音识别状态
     function toggleListening() {
@@ -1264,11 +1321,13 @@ function parseLessonFile(text) {
       }
     }
 
+
     // 保存当前进度
     function saveCurrentProgress() {
       gameData = { ...gameData, currentIndex, lessonStars, wrongList, puzzleQuestionsUsed };
       localStorage.setItem('wordGameData', JSON.stringify(gameData));
     }
+
 
     // 显示奖励
     function showReward(streak) {
@@ -1279,11 +1338,18 @@ function parseLessonFile(text) {
       showStreakEffect();
     }
 
+
     // 领取奖励
     function claimReward() {
-      dom.streakReward.classList.add("hidden");
-      nextQuestion();
+      // 如果是连续5题的奖励，直接触发奖励谜题
+      if (currentStreak === 5) {
+        dom.streakReward.classList.add("hidden");
+        showRewardPuzzle();
+      } else {
+        dom.streakReward.classList.add("hidden");
+      }
     }
+
 
     // 显示错题
     function showMistakes() {
@@ -1292,11 +1358,13 @@ function parseLessonFile(text) {
       loadCurrentLesson();
     }
 
+
     // 退出复习模式
     function exitReview() {
       isReviewMode = false;
       loadCurrentLesson();
     }
+
 
     // 重置进度
 	function resetProgress() {
@@ -1317,6 +1385,7 @@ function parseLessonFile(text) {
 		currentStreak = 0;
 		answerCorrect = false;
 		inPuzzle = false;
+		inRewardPuzzle = false; // 重置奖励谜题状态
 		isReviewMode = false;
 		currentReviewIndex = 0;
 		
@@ -1358,6 +1427,7 @@ function parseLessonFile(text) {
 	  }
 	}
 
+
     // 语音朗读功能
     function readWord() {
       if (!speechSynthAvailable) return;
@@ -1389,6 +1459,7 @@ function parseLessonFile(text) {
       window.speechSynthesis.speak(utterance);
     }
 
+
     // 计算字符串相似度
     function calculateSimilarity(s1, s2) {
       if (s1 === s2) return 1;
@@ -1399,6 +1470,7 @@ function parseLessonFile(text) {
       
       return (longerLen - editDistance(longer, shorter)) / parseFloat(longerLen);
     }
+
 
     // 编辑距离算法
     function editDistance(s1, s2) {
@@ -1424,6 +1496,7 @@ function parseLessonFile(text) {
       }
       return costs[s2.length];
     }
+
 
     // 页面加载完成后初始化游戏
     window.onload = init;
