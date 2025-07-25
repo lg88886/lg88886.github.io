@@ -112,9 +112,25 @@
       .btn-group .game-btn {
         @apply flex-1 justify-center;
       }
-      /* 课时选择器样式 */
-      .lesson-selector {
-        @apply mb-4 p-3 bg-white rounded-lg border border-gray-200 shadow-sm;
+      /* 选择器容器样式 */
+      .selector-container {
+        @apply grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4;
+      }
+      .form-selector {
+        @apply flex flex-col space-y-1;
+      }
+      .select-wrapper {
+        @apply relative;
+      }
+      .select-wrapper::after {
+        content: "▼";
+        @apply absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none;
+      }
+      .custom-select {
+        @apply w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all;
+      }
+      .stats-badge {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
       }
     }
   </style>
@@ -131,37 +147,53 @@
 
     <!-- 游戏主容器 -->
     <div class="bg-white rounded-xl p-5 sm:p-6 shadow-lg mb-6 animate-fade-in">
-      <!-- 文件选择区域 -->
+      <!-- 文件和课时选择区域 -->
       <div class="mb-5 pb-4 border-b border-gray-100">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="w-full sm:w-auto">
-            <label class="block text-sm font-medium text-gray-700 mb-1">选择单词文件：</label>
-            <select id="wordFileSelect" class="w-full sm:w-auto px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all">
-              <option value="default">默认单词库</option>
-              <option value="two">二年级单词</option>
-              <option value="threesh">三年级上单词</option>
-              <option value="basic">新概念1词库</option>
-            </select>
+        <!-- 选择器容器 - 移动端垂直排列，桌面端横向排列 -->
+        <div class="selector-container">
+          <!-- 单词库选择 -->
+          <div class="form-selector">
+            <label class="block text-sm font-medium text-gray-700">选择单词文件：</label>
+            <div class="select-wrapper">
+              <select id="wordFileSelect" class="custom-select">
+                <option value="default">默认单词库</option>
+                <option value="two">二年级单词</option>
+                <option value="threesh">三年级上单词</option>
+                <option value="basic">新概念1词库</option>
+              </select>
+            </div>
           </div>
-          <div class="flex gap-2 w-full sm:w-auto">
-            <button onclick="deleteCurrentFile()" id="deleteFileBtn" class="game-btn bg-red-500 text-white focus:ring-red-500 flex-1 sm:flex-none">
-              <i class="fa fa-trash-o mr-1"></i> 删除进度
-            </button>
-            <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none">
-              <i class="fa fa-refresh mr-1"></i> 重置进度
-            </button>
+          
+          <!-- 课时选择 -->
+          <div class="form-selector">
+            <label class="block text-sm font-medium text-gray-700">选择课时：</label>
+            <div class="select-wrapper">
+              <select id="lessonSelect" class="custom-select">
+                <option value="">请先选择单词库</option>
+              </select>
+            </div>
           </div>
         </div>
         
-        <!-- 课时选择器 -->
-        <div class="lesson-selector">
-          <label class="block text-sm font-medium text-gray-700 mb-1">选择课时：</label>
-          <select id="lessonSelect" class="w-full sm:w-auto px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all">
-            <option value="">请先选择单词库</option>
-          </select>
+        <!-- 操作按钮区域 -->
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none min-w-[120px]">
+            <i class="fa fa-refresh mr-1"></i> 重置进度
+          </button>
+          
+          <!-- 课时统计信息 -->
+          <div id="lessonStats" class="flex-1 flex items-center justify-center sm:justify-end text-sm text-gray-600">
+            <span id="statsInfo" class="hidden sm:inline-flex items-center">
+              <i class="fa fa-book text-primary mr-1"></i>
+              <span>总课时：--</span>
+              <span class="mx-2">|</span>
+              <span>总单词：--</span>
+            </span>
+          </div>
         </div>
         
-        <div id="fileNotification" class="mt-2 text-sm text-gray-600"></div>
+        <!-- 加载状态提示 -->
+        <div id="fileNotification" class="mt-1 text-sm text-gray-600"></div>
       </div>
 
       <!-- 游戏内容区域 -->
@@ -251,7 +283,7 @@
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
-  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
+  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
 
   <!-- 连续正确提示 -->
   <div id="streakEffect" class="streak-effect"></div>
@@ -418,7 +450,6 @@
       nextBtn: document.getElementById("nextBtn"),
       prevBtn: document.getElementById("prevBtn"),
       startReadingBtn: document.getElementById("startReadingBtn"),
-      deleteFileBtn: document.getElementById("deleteFileBtn"),
       fileNotification: document.getElementById("fileNotification"),
       similarityMeter: document.getElementById("similarityMeter"),
       similarityFill: document.getElementById("similarityFill"),
@@ -439,7 +470,6 @@
       
       // 加载默认文件
       loadSelectedWordFile();
-      updateDeleteButton();
       initSpeechRecognition();
       checkSpeechSynthesis();
     }
@@ -457,13 +487,6 @@
       }
     }
 
-    // 更新删除按钮状态
-    function updateDeleteButton() {
-      const isCustom = lessonWordLists[currentFile]?.isCustom;
-      dom.deleteFileBtn.disabled = !isCustom;
-      dom.deleteFileBtn.title = isCustom ? "" : "默认单词库不能删除";
-    }
-
     // 加载单词文件
     function loadSelectedWordFile() {
       const selectedFile = document.getElementById("wordFileSelect").value;
@@ -472,7 +495,6 @@
       saveCurrentProgress();
       currentFile = selectedFile;
       dom.fileNotification.textContent = "";
-      updateDeleteButton();
       
       const file = lessonWordLists[currentFile];
       
@@ -509,7 +531,6 @@
           return response.text();
         })
         .then(text => {
-          // 解析带课时的文件
           const lessons = parseLessonFile(text);
           
           if (lessons.length === 0) {
@@ -520,6 +541,10 @@
           lessonWordLists[currentFile].lessons = lessons;
           lessonWordLists[currentFile].loaded = true;
           dom.fileNotification.textContent = `加载成功！共 ${lessons.length} 个课时，${lessons.reduce((total, lesson) => total + lesson.words.length, 0)} 个单词`;
+          
+          // 更新统计信息显示
+          document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
+          document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
           
           // 更新课时选择器
           updateLessonSelector();
@@ -1073,59 +1098,6 @@ function parseLessonFile(text) {
       }, 2000);
     }
 
-    // 检查谜题答案
-    function checkPuzzleAnswer(puzzle, selected) {
-      const buttons = dom.options.querySelectorAll("button");
-      buttons.forEach(btn => {
-        btn.disabled = true;
-        if (btn.textContent === puzzle.answer) {
-          btn.className = "game-btn bg-green-500 text-white w-full text-left mb-2";
-        } else if (btn.textContent === selected) {
-          btn.className = "game-btn bg-red-500 text-white w-full text-left mb-2";
-        }
-      });
-
-      // 处理结果
-      if (selected === puzzle.answer) {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
-        dom.result.textContent = "🎉 恭喜你答对了！获得额外星星！";
-        dom.correctSound.play();
-        
-        // 奖励星星
-        lessonStars[currentFile] = lessonStars[currentFile] || {};
-        lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
-      } else {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
-        dom.result.textContent = `❌ 正确答案是：${puzzle.answer}`;
-        dom.wrongSound.play();
-      }
-
-      // 保存进度
-      saveCurrentProgress();
-      
-      // 2秒后进入下一课
-      setTimeout(() => {
-        const lessons = lessonWordLists[currentFile].lessons;
-        const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
-        
-        // 进入下一课
-        if (currentLessonIndex + 1 < lessons.length) {
-          currentLessonId = lessons[currentLessonIndex + 1].id;
-        } else {
-          // 如果是最后一课，循环到第一课时
-          currentLessonId = lessons[0].id;
-          dom.result.textContent += " 恭喜你完成了所有课时！将从第一课时重新开始。";
-        }
-        
-        currentIndex = 0;
-        inPuzzle = false;
-        loadCurrentLesson();
-        
-        // 更新课时选择器
-        dom.lessonSelect.value = currentLessonId;
-      }, 2000);
-    }
-
     // 语音识别初始化
     function initSpeechRecognition() {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -1247,31 +1219,6 @@ function parseLessonFile(text) {
         // 保存并重新加载
         saveCurrentProgress();
         loadCurrentLesson();
-      }
-    }
-
-    // 删除当前文件
-    function deleteCurrentFile() {
-      if (currentFile === "default") {
-        alert("默认单词库不能删除");
-        return;
-      }
-      
-      if (confirm(`确定要删除"${lessonWordLists[currentFile].name}"的所有数据吗？`)) {
-        // 从数据中删除
-        delete lessonWordLists[currentFile].loaded;
-        delete lessonWordLists[currentFile].lessons;
-        delete gameData.lessonStars[currentFile];
-        delete gameData.wrongList[currentFile];
-        delete gameData.puzzleQuestionsUsed[currentFile];
-        
-        // 切换到默认文件
-        currentFile = "default";
-        document.getElementById("wordFileSelect").value = "default";
-        
-        // 保存并重新加载
-        saveCurrentProgress();
-        loadSelectedWordFile();
       }
     }
 
