@@ -107,11 +107,12 @@
       }
       /* 移动端按钮布局优化 */
       .btn-group {
-        @apply grid grid-cols-1 sm:grid-cols-2 gap-2;
+        @apply grid grid-cols-2 gap-2 sm:flex sm:gap-2;
       }
       .btn-group .game-btn {
         @apply flex-1 justify-center;
       }
+      /* 选择器容器样式 */
       .selector-container {
         @apply grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4;
       }
@@ -175,50 +176,19 @@
         </div>
         
         <!-- 操作按钮区域 -->
-        <div class="mb-2">
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none min-w-[120px]">
+            <i class="fa fa-refresh mr-1"></i> 重置进度
+          </button>
+          
           <!-- 课时统计信息 -->
-          <div id="lessonStats" class="flex items-center justify-between text-sm text-gray-600 mb-2">
-            <span id="statsInfo" class="inline-flex items-center">
+          <div id="lessonStats" class="flex-1 flex items-center justify-center sm:justify-end text-sm text-gray-600">
+            <span id="statsInfo" class="hidden sm:inline-flex items-center">
               <i class="fa fa-book text-primary mr-1"></i>
               <span>总课时：--</span>
               <span class="mx-2">|</span>
               <span>总单词：--</span>
             </span>
-          </div>
-          
-          <!-- 按钮组 -->
-          <div class="btn-group">
-            <button onclick="prevQuestion()" id="prevBtn" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400">
-              <i class="fa fa-arrow-left mr-1"></i> 上一题
-            </button>
-            <button onclick="toggleListening()" id="startReadingBtn" class="game-btn bg-orange-500 text-white focus:ring-orange-500">
-              <i class="fa fa-microphone mr-1"></i> 开始朗读
-            </button>
-          </div>
-          
-          <div class="btn-group">
-            <button onclick="readWord()" class="game-btn bg-primary text-white focus:ring-primary">
-              <i class="fa fa-volume-up mr-1"></i> 听单词
-            </button>
-            <button onclick="showMistakes()" class="game-btn bg-green-500 text-white focus:ring-green-500">
-              <i class="fa fa-book mr-1"></i> 查看错题本
-            </button>
-          </div>
-          
-          <!-- 底部按钮组 - 重置进度按钮移到这里 -->
-          <div class="btn-group mt-2">
-            <button onclick="submitAnswer()" id="nextBtn" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400">
-              跳过此题 <i class="fa fa-arrow-right ml-1"></i>
-            </button>
-            <button onclick="resetProgress()" class="game-btn bg-red-500 text-white focus:ring-red-500">
-              <i class="fa fa-refresh mr-1"></i> 重置进度
-            </button>
-            <button onclick="exitReview()" class="game-btn bg-green-500 text-white focus:ring-green-500" style="display:none">
-              <i class="fa fa-arrow-left mr-1"></i> 返回闯关
-            </button>
-            <button onclick="nextQuestion()" id="continueBtn" class="game-btn bg-secondary text-white focus:ring-secondary" style="display:none">
-              <i class="fa fa-arrow-right mr-1"></i> 继续下一题
-            </button>
           </div>
         </div>
         
@@ -244,6 +214,37 @@
         <!-- 单词输入区域 -->
         <div class="flex justify-center mb-5 animate-slide-up" style="animation-delay: 0.2s">
           <div id="letterBox" class="flex gap-2 flex-wrap justify-center"></div>
+        </div>
+
+        <!-- 操作按钮 - 移动端优化布局 -->
+        <div class="mb-5 animate-slide-up" style="animation-delay: 0.3s">
+          <div class="btn-group mb-2">
+            <button onclick="prevQuestion()" id="prevBtn" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400">
+              <i class="fa fa-arrow-left mr-1"></i> 上一题
+            </button>
+            <button onclick="toggleListening()" id="startReadingBtn" class="game-btn bg-orange-500 text-white focus:ring-orange-500">
+              <i class="fa fa-microphone mr-1"></i> 开始朗读
+            </button>
+          </div>
+          <div class="btn-group">
+            <button onclick="readWord()" class="game-btn bg-primary text-white focus:ring-primary">
+              <i class="fa fa-volume-up mr-1"></i> 听单词
+            </button>
+            <button onclick="showMistakes()" class="game-btn bg-green-500 text-white focus:ring-green-500">
+              <i class="fa fa-book mr-1"></i> 查看错题本
+            </button>
+          </div>
+          <div class="btn-group mt-2">
+            <button onclick="submitAnswer()" id="nextBtn" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400">
+              跳过此题 <i class="fa fa-arrow-right ml-1"></i>
+            </button>
+            <button onclick="exitReview()" class="game-btn bg-green-500 text-white focus:ring-green-500" style="display:none">
+              <i class="fa fa-arrow-left mr-1"></i> 返回闯关
+            </button>
+            <button onclick="nextQuestion()" id="continueBtn" class="game-btn bg-secondary text-white focus:ring-secondary" style="display:none">
+              <i class="fa fa-arrow-right mr-1"></i> 继续下一题
+            </button>
+          </div>
         </div>
 
         <!-- 相似度指示器 -->
@@ -281,8 +282,8 @@
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
-  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
+  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
 
   <!-- 连续正确提示 -->
   <div id="streakEffect" class="streak-effect"></div>
@@ -555,59 +556,59 @@
     }
 
     // 解析带课时的词库文件
-    function parseLessonFile(text) {
-      const lessons = [];
-      let currentLesson = { id: 1, name: "第1课", words: [] };
-      let currentLessonId = 1;
-      let currentLessonName = `第${currentLessonId}课`;
+function parseLessonFile(text) {
+  const lessons = [];
+  let currentLesson = { id: 1, name: "第1课", words: [] };
+  let currentLessonId = 1;
+  let currentLessonName = `第${currentLessonId}课`;
 
-      // 按行分割，过滤空行和无效行
-      const lines = text.split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('//')); // 忽略注释行
+  // 按行分割，过滤空行和无效行
+  const lines = text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('//')); // 忽略注释行
 
-      lines.forEach(line => {
-        // 检测课时分隔符（支持"LessonX"和"LessonX:XXXXXX"两种格式）
-        const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
-        if (lessonMatch) {
-          // 保存当前课时（如果有单词）
-          if (currentLesson.words.length > 0) {
-            lessons.push(currentLesson);
-          }
-          // 创建新课时
-          currentLessonId = parseInt(lessonMatch[1]);
-          currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
-          currentLesson = {
-            id: currentLessonId,
-            name: currentLessonName,
-            words: []
-          };
-        } else {
-          // 解析单词行
-          const parts = line.split(',').map(p => p.trim());
-          if (parts.length >= 2) {
-            // 支持两种格式：
-            // 1. word,definition,phonetic
-            // 2. 序号,word,definition,phonetic
-            const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
-            if (wordIndex < parts.length) {
-              currentLesson.words.push({
-                word: parts[wordIndex],
-                definition: parts[wordIndex + 1],
-                phonetic: parts[wordIndex + 2] || '无'
-              });
-            }
-          }
-        }
-      });
-
-      // 添加最后一个课时
+  lines.forEach(line => {
+    // 检测课时分隔符（支持"LessonX"和"LessonX:XXXXXX"两种格式）
+    const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
+    if (lessonMatch) {
+      // 保存当前课时（如果有单词）
       if (currentLesson.words.length > 0) {
         lessons.push(currentLesson);
       }
-
-      return lessons;
+      // 创建新课时
+      currentLessonId = parseInt(lessonMatch[1]);
+      currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
+      currentLesson = {
+        id: currentLessonId,
+        name: currentLessonName,
+        words: []
+      };
+    } else {
+      // 解析单词行
+      const parts = line.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        // 支持两种格式：
+        // 1. word,definition,phonetic
+        // 2. 序号,word,definition,phonetic
+        const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
+        if (wordIndex < parts.length) {
+          currentLesson.words.push({
+            word: parts[wordIndex],
+            definition: parts[wordIndex + 1],
+            phonetic: parts[wordIndex + 2] || '无'
+          });
+        }
+      }
     }
+  });
+
+  // 添加最后一个课时
+  if (currentLesson.words.length > 0) {
+    lessons.push(currentLesson);
+  }
+
+  return lessons;
+}
 
     // 更新课时选择器
     function updateLessonSelector() {
@@ -1131,4 +1132,165 @@
             setTimeout(() => {
               // 移除错题（如果在复习模式）
               if (isReviewMode) {
-                wrongList[currentFile] = (wrongList[currentFile] ||
+                wrongList[currentFile] = (wrongList[currentFile] || []).filter(
+                  w => w.word.toLowerCase() !== currentWord
+                );
+              }
+              
+              nextQuestion();
+            }, 1000);
+          } else {
+            dom.result.textContent = `语音识别：${transcript}，请先正确拼写单词`;
+          }
+        } else {
+          dom.result.textContent = `未能识别："${transcript}"，请尝试再次朗读 "${currentWord}"`;
+        }
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        dom.startReadingBtn.textContent = "开始朗读";
+        dom.startReadingBtn.classList.remove("listening");
+      };
+    }
+
+    // 切换语音识别状态
+    function toggleListening() {
+      if (!recognition) return;
+      
+      if (isListening) {
+        recognition.stop();
+        isListening = false;
+        dom.startReadingBtn.textContent = "开始朗读";
+        dom.startReadingBtn.classList.remove("listening");
+      } else {
+        recognition.start();
+        isListening = true;
+        dom.startReadingBtn.textContent = "正在聆听...";
+        dom.startReadingBtn.classList.add("listening");
+        dom.result.textContent = "请朗读单词...";
+      }
+    }
+
+    // 保存当前进度
+    function saveCurrentProgress() {
+      gameData = { ...gameData, currentIndex, lessonStars, wrongList, puzzleQuestionsUsed };
+      localStorage.setItem('wordGameData', JSON.stringify(gameData));
+    }
+
+    // 显示奖励
+    function showReward(streak) {
+      const reward = streakRewards[streak];
+      dom.rewardMessage.innerHTML = `${reward.description}<br>${reward.action()}`;
+      dom.streakReward.classList.remove("hidden");
+      dom.rewardSound.play();
+      showStreakEffect();
+    }
+
+    // 领取奖励
+    function claimReward() {
+      dom.streakReward.classList.add("hidden");
+      nextQuestion();
+    }
+
+    // 显示错题
+    function showMistakes() {
+      isReviewMode = true;
+      currentReviewIndex = 0;
+      loadCurrentLesson();
+    }
+
+    // 退出复习模式
+    function exitReview() {
+      isReviewMode = false;
+      loadCurrentLesson();
+    }
+
+    // 重置进度
+    function resetProgress() {
+      if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
+        // 仅重置当前文件的进度
+        delete gameData.lessonStars[currentFile];
+        delete gameData.wrongList[currentFile];
+        delete gameData.puzzleQuestionsUsed[currentFile];
+        currentIndex = 0;
+        currentStreak = 0;
+        
+        // 保存并重新加载
+        saveCurrentProgress();
+        loadCurrentLesson();
+      }
+    }
+
+    // 语音朗读功能
+    function readWord() {
+      if (!speechSynthAvailable) return;
+      
+      // 停止任何正在进行的语音合成
+      window.speechSynthesis.cancel();
+      
+      // 获取当前单词
+      const currentWord = isReviewMode 
+        ? (wrongList[currentFile] || [])[currentReviewIndex].word
+        : getCurrentLesson().words[currentIndex].word;
+      
+      // 创建语音合成实例
+      const utterance = new SpeechSynthesisUtterance(currentWord);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.9; // 稍微降低语速，便于学习
+      
+      // 设置朗读完成后的回调
+      utterance.onend = () => {
+        console.log(`朗读完成: ${currentWord}`);
+      };
+      
+      utterance.onerror = (event) => {
+        console.error(`语音合成错误: ${event.error}`);
+        dom.result.textContent = "语音合成出错，请稍后再试";
+      };
+      
+      // 开始朗读
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // 计算字符串相似度
+    function calculateSimilarity(s1, s2) {
+      if (s1 === s2) return 1;
+      const longer = s1.length > s2.length ? s1 : s2;
+      const shorter = s1.length > s2.length ? s2 : s1;
+      const longerLen = longer.length;
+      if (longerLen === 0) return 1.0;
+      
+      return (longerLen - editDistance(longer, shorter)) / parseFloat(longerLen);
+    }
+
+    // 编辑距离算法
+    function editDistance(s1, s2) {
+      s1 = s1.toLowerCase();
+      s2 = s2.toLowerCase();
+      
+      const costs = [];
+      for (let i = 0; i <= s1.length; i++) {
+        let lastValue = i;
+        for (let j = 0; j <= s2.length; j++) {
+          if (i === 0) costs[j] = j;
+          else {
+            if (j > 0) {
+              let newValue = costs[j - 1];
+              if (s1.charAt(i - 1) !== s2.charAt(j - 1))
+                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+              costs[j - 1] = lastValue;
+              lastValue = newValue;
+            }
+          }
+        }
+        if (i > 0) costs[s2.length] = lastValue;
+      }
+      return costs[s2.length];
+    }
+
+    // 页面加载完成后初始化游戏
+    window.onload = init;
+  </script>
+</body>
+</html>
