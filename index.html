@@ -523,49 +523,59 @@
     }
 
     // 解析带课时的词库文件
-    function parseLessonFile(text) {
-      const lessons = [];
-      let currentLesson = { id: 1, name: "第1课", words: [] };
-      
-      // 按行分割，过滤空行和无效行
-      const lines = text.split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('//')); // 忽略注释行
+function parseLessonFile(text) {
+  const lessons = [];
+  let currentLesson = { id: 1, name: "第1课", words: [] };
+  let currentLessonId = 1;
+  let currentLessonName = `第${currentLessonId}课`;
 
-      lines.forEach(line => {
-        // 检测课时分隔符（如"Lesson 1: 时间词汇"）
-        const lessonMatch = line.match(/Lesson (\d+):?(.*)/i);
-        if (lessonMatch) {
-          // 保存当前课时（如果有单词）
-          if (currentLesson.words.length > 0) {
-            lessons.push(currentLesson);
-          }
-          // 创建新课时
-          currentLesson = {
-            id: parseInt(lessonMatch[1]),
-            name: lessonMatch[2].trim() || `第${lessonMatch[1]}课`,
-            words: []
-          };
-        } else {
-          // 解析单词行（格式：word,definition,phonetic）
-          const parts = line.split(',').map(p => p.trim());
-          if (parts.length >= 2) {
-            currentLesson.words.push({
-              word: parts[0],
-              definition: parts[1],
-              phonetic: parts[2] || '无'
-            });
-          }
-        }
-      });
-      
-      // 添加最后一个课时
+  // 按行分割，过滤空行和无效行
+  const lines = text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('//')); // 忽略注释行
+
+  lines.forEach(line => {
+    // 检测课时分隔符（支持"LessonX"和"LessonX:XXXXXX"两种格式）
+    const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
+    if (lessonMatch) {
+      // 保存当前课时（如果有单词）
       if (currentLesson.words.length > 0) {
         lessons.push(currentLesson);
       }
-      
-      return lessons;
+      // 创建新课时
+      currentLessonId = parseInt(lessonMatch[1]);
+      currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
+      currentLesson = {
+        id: currentLessonId,
+        name: currentLessonName,
+        words: []
+      };
+    } else {
+      // 解析单词行
+      const parts = line.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        // 支持两种格式：
+        // 1. word,definition,phonetic
+        // 2. 序号,word,definition,phonetic
+        const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
+        if (wordIndex < parts.length) {
+          currentLesson.words.push({
+            word: parts[wordIndex],
+            definition: parts[wordIndex + 1],
+            phonetic: parts[wordIndex + 2] || '无'
+          });
+        }
+      }
     }
+  });
+
+  // 添加最后一个课时
+  if (currentLesson.words.length > 0) {
+    lessons.push(currentLesson);
+  }
+
+  return lessons;
+}
 
     // 更新课时选择器
     function updateLessonSelector() {
