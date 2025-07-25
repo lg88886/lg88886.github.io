@@ -1,4 +1,4 @@
-Lesson1
+Lesson1:原谅
 excuse,原谅,/ik'skju:z/
 me,我(宾格),/mi:,mi/
 yes,是的,/jes/
@@ -11,7 +11,7 @@ it,它,/it/
 thank you,感谢你(们),/θæŋk juː/
 very much,非常地,/'veri mʌtʃ/
 
-Lesson2
+Lesson2:钢笔
 pen,钢笔,/pen/
 pencil,铅笔,/'pensl/
 book,书,/buk/
