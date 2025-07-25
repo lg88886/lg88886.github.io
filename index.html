@@ -498,6 +498,12 @@
       dom.fileNotification.textContent = "";
       
       const file = lessonWordLists[currentFile];
+	  
+	 // 新增：切换文件时重置当前课时ID
+	  if (file.lessons.length > 0) {
+		currentLessonId = file.lessons[0].id;
+		currentIndex = 0;
+	  }
       
       // 初始化当前文件的错题列表（如果不存在）
       if (!wrongList[currentFile]) {
@@ -1210,26 +1216,60 @@ function parseLessonFile(text) {
     // 重置进度
 	function resetProgress() {
 	  if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-		// 1. 重置内存中的当前文件数据（关键修复：同步更新引用变量）
-		if (lessonStars[currentFile]) delete lessonStars[currentFile];
-		wrongList[currentFile] = []; // 显式清空当前文件错题
-		puzzleQuestionsUsed[currentFile] = []; // 显式清空已用谜题
+		// 1. 彻底清除当前文件的所有数据（深度重置）
+		// 复制一份干净的对象，打破原引用关系
+		lessonStars = {...lessonStars};
+		delete lessonStars[currentFile]; // 清除当前文件星级
 		
-		// 2. 重置当前课时进度
+		wrongList = {...wrongList};
+		wrongList[currentFile] = []; // 清空当前文件错题
+		
+		puzzleQuestionsUsed = {...puzzleQuestionsUsed};
+		puzzleQuestionsUsed[currentFile] = []; // 清空已用谜题
+		
+		// 2. 重置所有进度变量
 		currentIndex = 0;
 		currentStreak = 0;
 		answerCorrect = false;
+		inPuzzle = false;
+		isReviewMode = false;
+		currentReviewIndex = 0;
 		
-		// 3. 更新gameData并保存到本地存储
-		gameData.lessonStars = lessonStars;
-		gameData.wrongList = wrongList;
-		gameData.puzzleQuestionsUsed = puzzleQuestionsUsed;
-		gameData.currentIndex = currentIndex;
-		saveCurrentProgress(); // 强制保存
+		// 3. 重置当前课时为第一课时
+		const file = lessonWordLists[currentFile];
+		if (file.lessons.length > 0) {
+		  currentLessonId = file.lessons[0].id;
+		}
 		
-		// 4. 强制刷新当前课时界面
-		loadCurrentLesson();
-		updateStats(); // 手动更新统计信息
+		// 4. 强制更新gameData并同步到本地存储
+		gameData = {
+		  ...gameData,
+		  currentIndex,
+		  lessonStars,
+		  wrongList,
+		  puzzleQuestionsUsed,
+		  currentLessonId // 新增：保存当前课时ID
+		};
+		// 彻底清除并重新设置localStorage
+		localStorage.removeItem('wordGameData');
+		localStorage.setItem('wordGameData', JSON.stringify(gameData));
+		
+		// 5. 强制刷新课时选择器和界面
+		document.getElementById("lessonSelect").value = currentLessonId;
+		loadCurrentLesson(); // 重新加载第一课时
+		updateStats(); // 强制更新统计
+		
+		// 6. 清空输入框并重置焦点
+		const inputs = dom.letterBox.querySelectorAll("input");
+		inputs.forEach(input => {
+		  input.value = '';
+		  input.className = 'word-input';
+		});
+		dom.letterBox.querySelector("input")?.focus();
+		
+		// 7. 显示重置成功提示
+		dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
+		dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
 	  }
 	}
 
