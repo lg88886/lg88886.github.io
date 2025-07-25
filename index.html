@@ -177,9 +177,7 @@
         
         <!-- 操作按钮区域 -->
         <div class="flex flex-wrap gap-2 mb-2">
-          <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none min-w-[120px]">
-            <i class="fa fa-refresh mr-1"></i> 重置进度
-          </button>
+
           
           <!-- 课时统计信息 -->
           <div id="lessonStats" class="flex-1 flex items-center justify-center sm:justify-end text-sm text-gray-600">
@@ -238,6 +236,9 @@
             <button onclick="submitAnswer()" id="nextBtn" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400">
               跳过此题 <i class="fa fa-arrow-right ml-1"></i>
             </button>
+		    <button onclick="resetProgress()" class="game-btn bg-gray-200 text-gray-700 focus:ring-gray-400 flex-1 sm:flex-none min-w-[120px]">
+            <i class="fa fa-refresh mr-1"></i> 重置进度
+          </button>
             <button onclick="exitReview()" class="game-btn bg-green-500 text-white focus:ring-green-500" style="display:none">
               <i class="fa fa-arrow-left mr-1"></i> 返回闯关
             </button>
