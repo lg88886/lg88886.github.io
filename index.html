@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>单词拼写闯关游戏V3.2 - 按课时学习</title>
+  <title>单词拼写闯关游戏V3.3 - 按课时学习</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <script>
@@ -1207,20 +1207,30 @@ function parseLessonFile(text) {
     }
 
     // 重置进度
-    function resetProgress() {
-      if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-        // 仅重置当前文件的进度
-        delete gameData.lessonStars[currentFile];
-        delete gameData.wrongList[currentFile];
-        delete gameData.puzzleQuestionsUsed[currentFile];
-        currentIndex = 0;
-        currentStreak = 0;
-        
-        // 保存并重新加载
-        saveCurrentProgress();
-        loadCurrentLesson();
-      }
-    }
+	function resetProgress() {
+	  if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
+		// 1. 重置内存中的当前文件数据（关键修复：同步更新引用变量）
+		if (lessonStars[currentFile]) delete lessonStars[currentFile];
+		wrongList[currentFile] = []; // 显式清空当前文件错题
+		puzzleQuestionsUsed[currentFile] = []; // 显式清空已用谜题
+		
+		// 2. 重置当前课时进度
+		currentIndex = 0;
+		currentStreak = 0;
+		answerCorrect = false;
+		
+		// 3. 更新gameData并保存到本地存储
+		gameData.lessonStars = lessonStars;
+		gameData.wrongList = wrongList;
+		gameData.puzzleQuestionsUsed = puzzleQuestionsUsed;
+		gameData.currentIndex = currentIndex;
+		saveCurrentProgress(); // 强制保存
+		
+		// 4. 强制刷新当前课时界面
+		loadCurrentLesson();
+		updateStats(); // 手动更新统计信息
+	  }
+	}
 
     // 语音朗读功能
     function readWord() {
