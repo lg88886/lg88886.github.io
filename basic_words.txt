@@ -73,7 +73,7 @@ Ford,福特,/fɔ:d/
 Fiat,菲亚特,/'faiæt,-ət/
 
 Lesson7
-I,我,/ai/
+I,我,/aɪ/
 am,be动词现在时第一人称单数,/m,əm,æm/
 are,be动词现在时复数,/ɑ:/
 name,名字,/'neim/
