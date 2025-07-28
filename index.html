@@ -306,8 +306,8 @@
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
-  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
+  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
 
 
   <!-- 连续正确提示 -->
@@ -473,6 +473,7 @@
     let answerCorrect = false; // 标记答案是否正确
     let speechSynthAvailable = false; // 语音合成可用状态
     let rewardPuzzleIndex = -1; // 记录当前奖励谜题索引
+    let autoSaveTimer; // 自动保存定时器
 
 
     // DOM元素缓存
@@ -501,8 +502,27 @@
     };
 
 
+    // 测试本地存储是否可用
+    function testLocalStorage() {
+      const testKey = 'storage_test';
+      try {
+        localStorage.setItem(testKey, 'test');
+        localStorage.removeItem(testKey);
+        return true;
+      } catch (e) {
+        console.error("本地存储不可用:", e);
+        return false;
+      }
+    }
+
+
     // 初始化
     function init() {
+      // 检查本地存储是否可用
+      if (!testLocalStorage()) {
+        document.getElementById('saveStatus').textContent = "警告：您的浏览器不支持本地存储，学习进度将无法保存";
+      }
+      
       // 初始化事件监听
       document.getElementById("wordFileSelect").addEventListener('change', loadSelectedWordFile);
       dom.lessonSelect.addEventListener('change', changeLesson);
@@ -514,6 +534,19 @@
       
       // 设置单词库选择器的初始值
       document.getElementById("wordFileSelect").value = currentFile;
+      
+      // 启动自动保存
+      startAutoSave();
+      
+      // 页面卸载时保存进度
+      window.addEventListener('beforeunload', saveCurrentProgress);
+    }
+
+
+    // 启动自动保存定时器
+    function startAutoSave() {
+      // 每30秒自动保存一次
+      autoSaveTimer = setInterval(saveCurrentProgress, 30000);
     }
 
 
@@ -898,6 +931,7 @@ function parseLessonFile(text) {
       inputs.forEach(input => userAnswer += (input.value || '').toLowerCase());
 
 
+
       // 检查是否填满
       if (userAnswer.length !== wordObj.word.length) return;
 
@@ -916,577 +950,4 @@ function parseLessonFile(text) {
       // 标记输入框状态
       inputs.forEach((input, i) => {
         const correctChar = wordObj.word[i].toLowerCase();
-        input.className = `word-input ${input.value.toLowerCase() === correctChar ? 'correct' : 'wrong'}`;
-      });
-
-
-      // 处理结果
-      if (isCorrect) {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
-        dom.result.textContent = `🎉 正确！单词：${wordObj.word}`;
-        dom.correctSound.play();
-        answerCorrect = true;
-        document.getElementById("continueBtn").style.display = "inline-block";
-        dom.nextBtn.style.display = "none";
-        currentStreak++;
-        
-        // 提示用户朗读单词
-        setTimeout(() => {
-          dom.result.textContent += " 请朗读单词以继续下一题";
-          dom.startReadingBtn.focus();
-        }, 500);
-        
-        // 检查连续正确奖励
-        if (streakRewards[currentStreak]) {
-          showReward(currentStreak);
-        }
-      } else {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
-        dom.result.textContent = `❌ 错误！正确单词：${wordObj.word}`;
-        dom.wrongSound.play();
-        currentStreak = 0;
-        
-        // 添加到错题本（去重）
-        wrongList[currentFile] = wrongList[currentFile] || [];
-        if (!wrongList[currentFile].some(w => w.word.toLowerCase() === wordObj.word.toLowerCase())) {
-          wrongList[currentFile].push(wordObj);
-        }
-
-
-        // 高亮错误字母1秒后清空
-        setTimeout(() => {
-          const inputs = dom.letterBox.querySelectorAll("input");
-          inputs.forEach((input, i) => {
-            const correctChar = wordObj.word[i].toLowerCase();
-            if (input.value.toLowerCase() !== correctChar) {
-              input.classList.add('highlight');
-            }
-          });
-          
-          // 1秒后清空输入框
-          setTimeout(() => {
-            inputs.forEach(input => {
-              input.value = '';
-              input.className = 'word-input';
-              input.classList.remove('highlight');
-            });
-            dom.letterBox.querySelector("input")?.focus();
-          }, 1000);
-        }, 500);
-      }
-      
-      // 保存进度
-      saveCurrentProgress();
-      updateStats();
-    }
-
-
-    // 显示连续正确效果
-    function showStreakEffect() {
-      const streakEl = document.getElementById("streakEffect");
-      streakEl.textContent = `+${currentStreak} 连击！`;
-      streakEl.style.display = "block";
-      setTimeout(() => {
-        streakEl.style.display = "none";
-      }, 1000);
-    }
-
-
-    // 下一题处理
-    function nextQuestion() {
-      // 保存当前进度
-      saveCurrentProgress();
-      
-      // 错题回顾模式
-      if (isReviewMode) {
-        currentReviewIndex++;
-        loadCurrentLesson();
-        return;
-      }
-      
-      // 正常模式
-      currentIndex++;
-      
-      // 检查是否完成当前课时
-      const lesson = getCurrentLesson();
-      if (currentIndex >= lesson.words.length && !inPuzzle && !inRewardPuzzle) {
-        // 显示谜题
-        showPuzzle();
-      } else {
-        // 继续当前课时
-        loadCurrentLesson();
-      }
-    }
-
-
-    // 上一题
-    function prevQuestion() {
-      if (isReviewMode) {
-        if (currentReviewIndex > 0) {
-          currentReviewIndex--;
-        }
-      } else if (currentIndex > 0) {
-        currentIndex--;
-        // 调整连续正确计数
-        if (currentStreak > 0) currentStreak--;
-      }
-      
-      loadCurrentLesson();
-    }
-
-
-    // 跳过当前题
-    function submitAnswer() {
-      if (isReviewMode) {
-        currentReviewIndex++;
-        loadCurrentLesson();
-        return;
-      }
-
-
-      if (inPuzzle) {
-        // 谜题跳过，进入下一课
-        const lessons = lessonWordLists[currentFile].lessons;
-        const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
-        
-        if (currentLessonIndex + 1 < lessons.length) {
-          currentLessonId = lessons[currentLessonIndex + 1].id;
-        } else {
-          currentLessonId = lessons[0].id; // 循环到第一课时
-        }
-        
-        currentIndex = 0;
-        inPuzzle = false;
-        saveCurrentProgress();
-        loadCurrentLesson();
-        return;
-      }
-      
-      // 奖励谜题跳过
-      if (inRewardPuzzle) {
-        inRewardPuzzle = false;
-        nextQuestion();
-        return;
-      }
-
-
-      // 正常题跳过（加入错题）
-      const lesson = getCurrentLesson();
-      const currentWord = lesson.words[currentIndex];
-      
-      wrongList[currentFile] = wrongList[currentFile] || [];
-      if (!wrongList[currentFile].some(w => w.word.toLowerCase() === currentWord.word.toLowerCase())) {
-        wrongList[currentFile].push(currentWord);
-      }
-      
-      currentStreak = 0;
-      currentIndex++;
-      saveCurrentProgress();
-      loadCurrentLesson();
-    }
-
-
-    // 显示课时完成谜题
-    function showPuzzle() {
-      inPuzzle = true;
-      const lesson = getCurrentLesson();
-      
-      // 初始化当前文件的谜题使用记录
-      puzzleQuestionsUsed[currentFile] = puzzleQuestionsUsed[currentFile] || [];
-      
-      // 选择未使用的谜题
-      let availablePuzzles = puzzleQuestions.filter((_, index) => 
-        !puzzleQuestionsUsed[currentFile].includes(index)
-      );
-      
-      // 如果所有谜题都用过了，重置
-      if (availablePuzzles.length === 0) {
-        availablePuzzles = puzzleQuestions;
-        puzzleQuestionsUsed[currentFile] = [];
-      }
-      
-      // 随机选择一个谜题
-      const puzzleIndex = Math.floor(Math.random() * availablePuzzles.length);
-      const puzzle = availablePuzzles[puzzleIndex];
-      puzzleQuestionsUsed[currentFile].push(puzzleQuestions.indexOf(puzzle));
-
-
-      // 显示谜题
-      dom.instruction.innerHTML = `<span class="level-badge">${lesson.name} 完成挑战</span> 恭喜完成本课时，来挑战一个小谜题吧！`;
-      dom.question.textContent = puzzle.question;
-      dom.definition.textContent = "请选择正确答案：";
-      dom.phonetic.textContent = "";
-      dom.letterBox.innerHTML = "";
-
-
-      // 生成选项
-      puzzle.options.forEach(option => {
-        const btn = document.createElement("button");
-        btn.className = "game-btn bg-gray-200 text-gray-700 w-full text-left mb-2";
-        btn.textContent = option;
-        btn.onclick = () => checkPuzzleAnswer(puzzle, option, false);
-        dom.options.appendChild(btn);
-      });
-    }
-
-
-    // 显示连续答对奖励谜题
-    function showRewardPuzzle() {
-      inRewardPuzzle = true;
-      const lesson = getCurrentLesson();
-      
-      // 随机选择一个奖励谜题
-      rewardPuzzleIndex = Math.floor(Math.random() * rewardPuzzles.length);
-      const puzzle = rewardPuzzles[rewardPuzzleIndex];
-
-
-      // 显示谜题
-      dom.instruction.innerHTML = `<span class="level-badge">🎉 连续答对奖励</span> 恭喜连续答对5题！来挑战一个奖励谜题吧！`;
-      dom.question.textContent = puzzle.question;
-      dom.definition.textContent = "请选择正确答案：";
-      dom.phonetic.textContent = "";
-      dom.letterBox.innerHTML = "";
-      dom.streakReward.classList.add("hidden");
-
-
-      // 生成选项
-      puzzle.options.forEach(option => {
-        const btn = document.createElement("button");
-        btn.className = "game-btn bg-yellow-200 text-yellow-800 w-full text-left mb-2";
-        btn.textContent = option;
-        btn.onclick = () => checkPuzzleAnswer(puzzle, option, true);
-        dom.options.appendChild(btn);
-      });
-    }
-
-
-    // 检查谜题答案
-    function checkPuzzleAnswer(puzzle, selected, isRewardPuzzle) {
-      const buttons = dom.options.querySelectorAll("button");
-      buttons.forEach(btn => {
-        btn.disabled = true;
-        if (btn.textContent === puzzle.answer) {
-          btn.className = "game-btn bg-green-500 text-white w-full text-left mb-2";
-        } else if (btn.textContent === selected) {
-          btn.className = "game-btn bg-red-500 text-white w-full text-left mb-2";
-        }
-      });
-
-
-      // 处理结果
-      if (selected === puzzle.answer) {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
-        dom.result.textContent = "🎉 恭喜你答对了！获得额外奖励！";
-        dom.correctSound.play();
-        
-        // 奖励星星
-        lessonStars[currentFile] = lessonStars[currentFile] || {};
-        lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
-        dom.result.textContent += ` 当前课时星星：${lessonStars[currentFile][currentLessonId]}/3 ⭐`;
-      } else {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
-        dom.result.textContent = `❌ 正确答案是：${puzzle.answer}`;
-        dom.wrongSound.play();
-      }
-
-
-      // 保存进度
-      saveCurrentProgress();
-      
-      // 非奖励谜题（课时完成谜题）的处理
-      if (!isRewardPuzzle) {
-        // 2秒后进入下一课
-        setTimeout(() => {
-          const lessons = lessonWordLists[currentFile].lessons;
-          const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
-          
-          // 进入下一课
-          if (currentLessonIndex + 1 < lessons.length) {
-            currentLessonId = lessons[currentLessonIndex + 1].id;
-          } else {
-            // 如果是最后一课，循环到第一课时
-            currentLessonId = lessons[0].id;
-            dom.result.textContent += " 恭喜你完成了所有课时！将从第一课时重新开始。";
-          }
-          
-          currentIndex = 0;
-          inPuzzle = false;
-          loadCurrentLesson();
-          
-          // 更新课时选择器
-          dom.lessonSelect.value = currentLessonId;
-        }, 2000);
-      } else {
-        // 奖励谜题的处理
-        setTimeout(() => {
-          inRewardPuzzle = false;
-          nextQuestion();
-        }, 2000);
-      }
-    }
-
-
-    // 语音识别初始化
-    function initSpeechRecognition() {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        dom.startReadingBtn.disabled = true;
-        dom.startReadingBtn.title = "你的浏览器不支持语音识别";
-        return;
-      }
-
-
-      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = 'en-US';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.toLowerCase();
-        
-        // 获取当前单词（转为小写）
-        const currentWord = isReviewMode 
-          ? (wrongList[currentFile] || [])[currentReviewIndex].word.toLowerCase()
-          : getCurrentLesson().words[currentIndex].word.toLowerCase();
-        
-        // 检查语音是否匹配单词（包括变体）
-        const variants = [currentWord, ...(pronunciationVariants[currentWord] || [])];
-        const isMatch = variants.some(variant => 
-          transcript.includes(variant) || variant.includes(transcript)
-        );
-
-
-        // 处理识别结果
-        if (isMatch) {
-          if (answerCorrect) {
-            dom.result.textContent = `🎉 语音识别成功！单词：${currentWord}`;
-            setTimeout(() => {
-              // 移除错题（如果在复习模式）
-              if (isReviewMode) {
-                wrongList[currentFile] = (wrongList[currentFile] || []).filter(
-                  w => w.word.toLowerCase() !== currentWord
-                );
-              }
-              
-              nextQuestion();
-            }, 1000);
-          } else {
-            dom.result.textContent = `语音识别：${transcript}，请先正确拼写单词`;
-          }
-        } else {
-          dom.result.textContent = `未能识别："${transcript}"，请尝试再次朗读 "${currentWord}"`;
-        }
-      };
-
-
-      recognition.onend = () => {
-        isListening = false;
-        dom.startReadingBtn.textContent = "开始朗读";
-        dom.startReadingBtn.classList.remove("listening");
-      };
-    }
-
-
-    // 切换语音识别状态
-    function toggleListening() {
-      if (!recognition) return;
-      
-      if (isListening) {
-        recognition.stop();
-        isListening = false;
-        dom.startReadingBtn.textContent = "开始朗读";
-        dom.startReadingBtn.classList.remove("listening");
-      } else {
-        recognition.start();
-        isListening = true;
-        dom.startReadingBtn.textContent = "正在聆听...";
-        dom.startReadingBtn.classList.add("listening");
-        dom.result.textContent = "请朗读单词...";
-      }
-    }
-
-
-    // 保存当前进度 - 修复：添加currentFile和currentLessonId的保存
-    function saveCurrentProgress() {
-      gameData = { 
-        currentFile,          // 保存当前单词库文件
-        currentLessonId,      // 保存当前课时ID
-        currentIndex, 
-        lessonStars, 
-        wrongList, 
-        puzzleQuestionsUsed 
-      };
-      
-      try {
-        localStorage.setItem('wordGameData', JSON.stringify(gameData));
-        document.getElementById('saveStatus').textContent = "进度已自动保存";
-      } catch (e) {
-        console.error("无法保存进度:", e);
-        document.getElementById('saveStatus').textContent = "进度保存失败，请启用本地存储";
-      }
-    }
-
-
-    // 显示奖励
-    function showReward(streak) {
-      const reward = streakRewards[streak];
-      dom.rewardMessage.innerHTML = `${reward.description}<br>${reward.action()}`;
-      dom.streakReward.classList.remove("hidden");
-      dom.rewardSound.play();
-      showStreakEffect();
-    }
-
-
-    // 领取奖励
-    function claimReward() {
-      // 如果是连续5题的奖励，直接触发奖励谜题
-      if (currentStreak === 5) {
-        dom.streakReward.classList.add("hidden");
-        showRewardPuzzle();
-      } else {
-        dom.streakReward.classList.add("hidden");
-      }
-    }
-
-
-    // 显示错题
-    function showMistakes() {
-      isReviewMode = true;
-      currentReviewIndex = 0;
-      loadCurrentLesson();
-    }
-
-
-    // 退出复习模式
-    function exitReview() {
-      isReviewMode = false;
-      loadCurrentLesson();
-    }
-
-
-    // 重置进度
-	function resetProgress() {
-	  if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-		// 1. 彻底清除当前文件的所有数据
-		lessonStars = {...lessonStars};
-		delete lessonStars[currentFile]; // 清除当前文件星级
-		
-		wrongList = {...wrongList};
-		wrongList[currentFile] = []; // 清空当前文件错题
-		
-		puzzleQuestionsUsed = {...puzzleQuestionsUsed};
-		puzzleQuestionsUsed[currentFile] = []; // 清空已用谜题
-		
-		// 2. 重置所有进度变量
-		currentIndex = 0;
-		currentStreak = 0;
-		answerCorrect = false;
-		inPuzzle = false;
-		inRewardPuzzle = false;
-		isReviewMode = false;
-		currentReviewIndex = 0;
-		
-		// 3. 重置当前课时为第一课时
-		const file = lessonWordLists[currentFile];
-		if (file.lessons.length > 0) {
-		  currentLessonId = file.lessons[0].id;
-		}
-		
-		// 4. 强制更新gameData并同步到本地存储
-		gameData = {
-		  currentFile,
-		  currentLessonId,
-		  currentIndex,
-		  lessonStars,
-		  wrongList,
-		  puzzleQuestionsUsed
-		};
-		localStorage.removeItem('wordGameData');
-		localStorage.setItem('wordGameData', JSON.stringify(gameData));
-		
-		// 5. 强制刷新课时选择器和界面
-		document.getElementById("lessonSelect").value = currentLessonId;
-		loadCurrentLesson();
-		
-		// 6. 显示重置成功提示
-		dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
-		dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
-	  }
-	}
-
-
-    // 语音朗读功能
-    function readWord() {
-      if (!speechSynthAvailable) return;
-      
-      // 停止任何正在进行的语音合成
-      window.speechSynthesis.cancel();
-      
-      // 获取当前单词
-      const currentWord = isReviewMode 
-        ? (wrongList[currentFile] || [])[currentReviewIndex].word
-        : getCurrentLesson().words[currentIndex].word;
-      
-      // 创建语音合成实例
-      const utterance = new SpeechSynthesisUtterance(currentWord);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.9; // 稍微降低语速，便于学习
-      
-      // 设置朗读完成后的回调
-      utterance.onend = () => {
-        console.log(`朗读完成: ${currentWord}`);
-      };
-      
-      utterance.onerror = (event) => {
-        console.error(`语音合成错误: ${event.error}`);
-        dom.result.textContent = "语音合成出错，请稍后再试";
-      };
-      
-      // 开始朗读
-      window.speechSynthesis.speak(utterance);
-    }
-
-
-    // 计算字符串相似度
-    function calculateSimilarity(s1, s2) {
-      if (s1 === s2) return 1;
-      const longer = s1.length > s2.length ? s1 : s2;
-      const shorter = s1.length > s2.length ? s2 : s1;
-      const longerLen = longer.length;
-      if (longerLen === 0) return 1.0;
-      
-      return (longerLen - editDistance(longer, shorter)) / parseFloat(longerLen);
-    }
-
-
-    // 编辑距离算法
-    function editDistance(s1, s2) {
-      s1 = s1.toLowerCase();
-      s2 = s2.toLowerCase();
-      
-      const costs = [];
-      for (let i = 0; i <= s1.length; i++) {
-        let lastValue = i;
-        for (let j = 0; j <= s2.length; j++) {
-          if (i === 0) costs[j] = j;
-          else {
-            if (j > 0) {
-              let newValue = costs[j - 1];
-              if (s1.charAt(i - 1) !== s2.charAt(j - 1))
-                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-              costs[j - 1] = lastValue;
-              lastValue = newValue;
-            }
-          }
-        }
-        if (i > 0) costs[s2.length] = lastValue;
-      }
-      return costs[s2.length];
-    }
-
-
-    // 页面加载完成后初始化游戏
-    window.onload = init;
-  </script>
-</body>
-</html>
+        input.className = `word-input ${input.value.toLowerCase
