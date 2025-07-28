@@ -203,6 +203,8 @@
         
         <!-- 加载状态提示 -->
         <div id="fileNotification" class="mt-1 text-sm text-gray-600"></div>
+        <!-- 保存状态提示 -->
+        <div id="saveStatus" class="text-xs text-gray-500 mt-1"></div>
       </div>
 
 
@@ -448,10 +450,10 @@
     };
 
 
-    // 游戏核心变量
-    let currentFile = "default";
-    let currentLessonId = 1;
+    // 游戏核心变量 - 修复：添加currentFile和currentLessonId的保存
     let gameData = JSON.parse(localStorage.getItem('wordGameData')) || {
+      currentFile: "default",  // 新增：当前单词库文件
+      currentLessonId: 1,      // 新增：当前课时ID
       currentIndex: 0, 
       lessonStars: {}, // 按文件和课时保存星级 {file: {lessonId: stars}}
       wrongList: {},   // 按文件保存错题 {file: [words]}
@@ -459,8 +461,8 @@
     };
 
 
-    // 内存变量
-    let { currentIndex, lessonStars, wrongList, puzzleQuestionsUsed } = gameData;
+    // 内存变量 - 修复：从gameData中获取currentFile和currentLessonId
+    let { currentFile, currentLessonId, currentIndex, lessonStars, wrongList, puzzleQuestionsUsed } = gameData;
     let inPuzzle = false;
     let inRewardPuzzle = false; // 新增：标记是否在奖励谜题中
     let isReviewMode = false;
@@ -509,6 +511,9 @@
       loadSelectedWordFile();
       initSpeechRecognition();
       checkSpeechSynthesis();
+      
+      // 设置单词库选择器的初始值
+      document.getElementById("wordFileSelect").value = currentFile;
     }
 
 
@@ -531,8 +536,8 @@
       const selectedFile = document.getElementById("wordFileSelect").value;
       if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
       
-      saveCurrentProgress();
-      currentFile = selectedFile;
+      saveCurrentProgress();  // 保存当前进度
+      currentFile = selectedFile;  // 更新当前文件
       dom.fileNotification.textContent = "";
       
       const file = lessonWordLists[currentFile];
@@ -697,14 +702,10 @@ function parseLessonFile(text) {
       const selectedLessonId = parseInt(dom.lessonSelect.value);
       if (selectedLessonId === currentLessonId) return;
       
-      // 保存当前进度
-      saveCurrentProgress();
+      saveCurrentProgress();  // 保存当前进度
+      currentLessonId = selectedLessonId;  // 更新当前课时
+      currentIndex = 0;  // 切换课时时重置题目索引
       
-      // 更新当前课时
-      currentLessonId = selectedLessonId;
-      currentIndex = 0;
-      
-      // 加载新课时
       loadCurrentLesson();
     }
 
@@ -1129,7 +1130,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 显示连续答对奖励谜题（新增功能）
+    // 显示连续答对奖励谜题
     function showRewardPuzzle() {
       inRewardPuzzle = true;
       const lesson = getCurrentLesson();
@@ -1159,7 +1160,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 检查谜题答案（修改为支持奖励谜题）
+    // 检查谜题答案
     function checkPuzzleAnswer(puzzle, selected, isRewardPuzzle) {
       const buttons = dom.options.querySelectorAll("button");
       buttons.forEach(btn => {
@@ -1178,7 +1179,7 @@ function parseLessonFile(text) {
         dom.result.textContent = "🎉 恭喜你答对了！获得额外奖励！";
         dom.correctSound.play();
         
-        // 奖励星星（保持星星系统，但不与连续3题关联）
+        // 奖励星星
         lessonStars[currentFile] = lessonStars[currentFile] || {};
         lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
         dom.result.textContent += ` 当前课时星星：${lessonStars[currentFile][currentLessonId]}/3 ⭐`;
@@ -1305,10 +1306,24 @@ function parseLessonFile(text) {
     }
 
 
-    // 保存当前进度
+    // 保存当前进度 - 修复：添加currentFile和currentLessonId的保存
     function saveCurrentProgress() {
-      gameData = { ...gameData, currentIndex, lessonStars, wrongList, puzzleQuestionsUsed };
-      localStorage.setItem('wordGameData', JSON.stringify(gameData));
+      gameData = { 
+        currentFile,          // 保存当前单词库文件
+        currentLessonId,      // 保存当前课时ID
+        currentIndex, 
+        lessonStars, 
+        wrongList, 
+        puzzleQuestionsUsed 
+      };
+      
+      try {
+        localStorage.setItem('wordGameData', JSON.stringify(gameData));
+        document.getElementById('saveStatus').textContent = "进度已自动保存";
+      } catch (e) {
+        console.error("无法保存进度:", e);
+        document.getElementById('saveStatus').textContent = "进度保存失败，请启用本地存储";
+      }
     }
 
 
@@ -1352,8 +1367,7 @@ function parseLessonFile(text) {
     // 重置进度
 	function resetProgress() {
 	  if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-		// 1. 彻底清除当前文件的所有数据（深度重置）
-		// 复制一份干净的对象，打破原引用关系
+		// 1. 彻底清除当前文件的所有数据
 		lessonStars = {...lessonStars};
 		delete lessonStars[currentFile]; // 清除当前文件星级
 		
@@ -1368,7 +1382,7 @@ function parseLessonFile(text) {
 		currentStreak = 0;
 		answerCorrect = false;
 		inPuzzle = false;
-		inRewardPuzzle = false; // 重置奖励谜题状态
+		inRewardPuzzle = false;
 		isReviewMode = false;
 		currentReviewIndex = 0;
 		
@@ -1380,31 +1394,21 @@ function parseLessonFile(text) {
 		
 		// 4. 强制更新gameData并同步到本地存储
 		gameData = {
-		  ...gameData,
+		  currentFile,
+		  currentLessonId,
 		  currentIndex,
 		  lessonStars,
 		  wrongList,
-		  puzzleQuestionsUsed,
-		  currentLessonId // 新增：保存当前课时ID
+		  puzzleQuestionsUsed
 		};
-		// 彻底清除并重新设置localStorage
 		localStorage.removeItem('wordGameData');
 		localStorage.setItem('wordGameData', JSON.stringify(gameData));
 		
 		// 5. 强制刷新课时选择器和界面
 		document.getElementById("lessonSelect").value = currentLessonId;
-		loadCurrentLesson(); // 重新加载第一课时
-		updateStats(); // 强制更新统计
+		loadCurrentLesson();
 		
-		// 6. 清空输入框并重置焦点
-		const inputs = dom.letterBox.querySelectorAll("input");
-		inputs.forEach(input => {
-		  input.value = '';
-		  input.className = 'word-input';
-		});
-		dom.letterBox.querySelector("input")?.focus();
-		
-		// 7. 显示重置成功提示
+		// 6. 显示重置成功提示
 		dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
 		dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
 	  }
