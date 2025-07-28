@@ -303,7 +303,7 @@
   <audio id="bgm" autoplay loop>
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
-  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
+  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></think>
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
   <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
 
@@ -448,27 +448,61 @@
     };
 
 
-    // 游戏核心变量 - 从localStorage恢复或初始化
-    let gameData = JSON.parse(localStorage.getItem('wordGameData')) || {
-      currentFile: "default",      // 保存当前单词库
-      currentLessonId: 1,          // 保存当前课时ID
-      currentIndex: 0,             // 保存当前题目位置
-      lessonStars: {},             // 按文件和课时保存星级 {file: {lessonId: stars}}
-      wrongList: {},               // 按文件保存错题 {file: [words]}
-      puzzleQuestionsUsed: {}      // 按文件保存已使用的谜题 {file: [indices]}
+    // 初始化游戏数据结构 - 按单词库独立保存
+    const defaultGameData = {
+      // 每个单词库的独立数据
+      "default": {
+        currentLessonId: 1,
+        currentIndex: 0,
+        lessonStars: {},
+        wrongList: [],
+        puzzleQuestionsUsed: []
+      },
+      "two": {
+        currentLessonId: 1,
+        currentIndex: 0,
+        lessonStars: {},
+        wrongList: [],
+        puzzleQuestionsUsed: []
+      },
+      "threesh": {
+        currentLessonId: 1,
+        currentIndex: 0,
+        lessonStars: {},
+        wrongList: [],
+        puzzleQuestionsUsed: []
+      },
+      "basic": {
+        currentLessonId: 1,
+        currentIndex: 0,
+        lessonStars: {},
+        wrongList: [],
+        puzzleQuestionsUsed: []
+      }
     };
 
+    // 从localStorage加载数据，合并默认值
+    let allGameData = JSON.parse(localStorage.getItem('wordGameData')) || {};
+    // 合并默认数据结构，确保所有单词库都有基础数据
+    Object.keys(defaultGameData).forEach(file => {
+      if (!allGameData[file]) {
+        allGameData[file] = {...defaultGameData[file]};
+      }
+    });
 
-    // 内存变量 - 从gameData初始化
-    let { 
-      currentFile, 
-      currentLessonId, 
-      currentIndex, 
-      lessonStars, 
-      wrongList, 
-      puzzleQuestionsUsed 
-    } = gameData;
-    
+    // 当前活动的单词库
+    let currentFile = "default";
+    // 从当前单词库数据初始化变量
+    let {
+      currentLessonId,
+      currentIndex,
+      lessonStars,
+      wrongList,
+      puzzleQuestionsUsed
+    } = allGameData[currentFile];
+
+
+    // 其他游戏状态变量
     let inPuzzle = false;
     let inRewardPuzzle = false;
     let isReviewMode = false;
@@ -538,32 +572,32 @@
     }
 
 
-    // 加载单词文件 - 修改为保存当前单词库
+    // 加载单词文件 - 核心修改：切换时加载对应单词库的历史数据
     function loadSelectedWordFile() {
       const selectedFile = dom.wordFileSelect.value;
       if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
       
-      saveCurrentProgress();  // 保存当前进度
-      currentFile = selectedFile;  // 更新当前单词库
+      // 保存当前单词库的进度
+      saveCurrentProgress();
+      
+      // 切换到新的单词库
+      currentFile = selectedFile;
+      
+      // 从全局数据中加载新单词库的历史数据
+      const fileData = allGameData[currentFile];
+      currentLessonId = fileData.currentLessonId;
+      currentIndex = fileData.currentIndex;
+      lessonStars = fileData.lessonStars;
+      wrongList = fileData.wrongList;
+      puzzleQuestionsUsed = fileData.puzzleQuestionsUsed;
+      
       dom.fileNotification.textContent = "";
-      
       const file = lessonWordLists[currentFile];
-	  
-      // 切换文件时重置当前课时ID和索引
-      if (file.lessons.length > 0) {
-        currentLessonId = file.lessons[0].id;
-        currentIndex = 0;
-      }
       
-      // 初始化当前文件的错题列表（如果不存在）
-      if (!wrongList[currentFile]) {
-        wrongList[currentFile] = [];
-      }
-      
-      // 初始化当前文件的谜题使用记录（如果不存在）
-      if (!puzzleQuestionsUsed[currentFile]) {
-        puzzleQuestionsUsed[currentFile] = [];
-      }
+      // 初始化当前文件的基础数据结构
+      if (!wrongList) wrongList = [];
+      if (!lessonStars) lessonStars = {};
+      if (!puzzleQuestionsUsed) puzzleQuestionsUsed = [];
       
       // 如果文件已加载，直接更新界面
       if (file.loaded) {
@@ -603,6 +637,14 @@
           // 更新统计信息显示
           document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
           document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
+          
+          // 检查历史课时ID是否存在于当前单词库中，不存在则重置
+          const hasValidLesson = lessons.some(lesson => lesson.id === currentLessonId);
+          if (!hasValidLesson) {
+            currentLessonId = lessons[0].id;
+            currentIndex = 0;
+            saveCurrentProgress();
+          }
           
           // 更新课时选择器
           updateLessonSelector();
@@ -674,7 +716,7 @@
     }
 
 
-    // 更新课时选择器 - 选中保存的课时
+    // 更新课时选择器 - 选中历史课时
     function updateLessonSelector() {
       const file = lessonWordLists[currentFile];
       const lessonSelect = dom.lessonSelect;
@@ -690,14 +732,15 @@
         lessonSelect.appendChild(option);
       });
       
-      // 设置当前课时（如果存在）
+      // 确保当前课时有效
       const hasCurrentLesson = file.lessons.some(lesson => lesson.id === currentLessonId);
       if (!hasCurrentLesson && file.lessons.length > 0) {
         currentLessonId = file.lessons[0].id;
         currentIndex = 0;
+        saveCurrentProgress();
       }
       
-      // 设置选中的课时为保存的值
+      // 设置选中的课时为历史记录
       lessonSelect.value = currentLessonId;
       
       // 加载当前课时
@@ -705,7 +748,7 @@
     }
 
 
-    // 切换课时 - 修改为保存当前课时
+    // 切换课时
     function changeLesson() {
       const selectedLessonId = parseInt(dom.lessonSelect.value);
       if (selectedLessonId === currentLessonId) return;
@@ -727,12 +770,9 @@
       const file = lessonWordLists[currentFile];
       const lesson = getCurrentLesson();
       
-      // 初始化当前文件的错题列表（如果不存在）
-      wrongList[currentFile] = wrongList[currentFile] || [];
-      
       dom.stats.innerHTML = `
         <div><i class="fa fa-check-circle text-green-500 mr-1"></i> 正确：<b>${getCorrectCount()}</b></div>
-        <div><i class="fa fa-times-circle text-red-500 mr-1"></i> 错误：<b>${wrongList[currentFile].length}</b></div>
+        <div><i class="fa fa-times-circle text-red-500 mr-1"></i> 错误：<b>${wrongList.length}</b></div>
         <div><i class="fa fa-book text-primary mr-1"></i> 进度：<b>${currentIndex + 1}/${lesson.words.length}</b></div>
       `;
     }
@@ -742,7 +782,7 @@
     function getCorrectCount() {
       const lesson = getCurrentLesson();
       const lessonWords = lesson.words.map(word => word.word.toLowerCase());
-      const wrongWords = (wrongList[currentFile] || []).map(word => word.word.toLowerCase());
+      const wrongWords = wrongList.map(word => word.word.toLowerCase());
       
       // 计算正确数 = 已完成单词数 - 其中的错误单词数
       return Math.min(currentIndex, lesson.words.length) - 
@@ -788,12 +828,16 @@
         return;
       }
       
+      // 确保当前索引有效
+      if (currentIndex >= lesson.words.length) {
+        currentIndex = 0;
+      }
+      
       // 错题回顾模式
       if (isReviewMode) {
         document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
-        const fileWrongList = wrongList[currentFile] || [];
         
-        if (fileWrongList.length === 0) {
+        if (wrongList.length === 0) {
           dom.instruction.textContent = "🎉 恭喜你攻克了所有错题！";
           dom.definition.textContent = "继续加油哦！";
           dom.phonetic.textContent = "";
@@ -802,9 +846,9 @@
           return;
         }
         
-        currentReviewIndex = Math.min(currentReviewIndex, fileWrongList.length - 1);
-        const wordObj = fileWrongList[currentReviewIndex];
-        dom.instruction.innerHTML = `<span class="level-badge">错题回顾</span> 第 ${currentReviewIndex + 1}/${fileWrongList.length} 题`;
+        currentReviewIndex = Math.min(currentReviewIndex, wrongList.length - 1);
+        const wordObj = wrongList[currentReviewIndex];
+        dom.instruction.innerHTML = `<span class="level-badge">错题回顾</span> 第 ${currentReviewIndex + 1}/${wrongList.length} 题`;
         dom.definition.textContent = `中文提示：${wordObj.definition}`;
         dom.phonetic.textContent = `音标：${wordObj.phonetic || '无'}`;
         generateInputBoxes(wordObj);
@@ -899,7 +943,7 @@
     function checkAnswer() {
       // 获取当前单词
       const wordObj = isReviewMode 
-        ? (wrongList[currentFile] || [])[currentReviewIndex]
+        ? wrongList[currentReviewIndex]
         : getCurrentLesson().words[currentIndex];
       
       if (!wordObj) return;
@@ -959,9 +1003,8 @@
         currentStreak = 0;
         
         // 添加到错题本（去重）
-        wrongList[currentFile] = wrongList[currentFile] || [];
-        if (!wrongList[currentFile].some(w => w.word.toLowerCase() === wordObj.word.toLowerCase())) {
-          wrongList[currentFile].push(wordObj);
+        if (!wrongList.some(w => w.word.toLowerCase() === wordObj.word.toLowerCase())) {
+          wrongList.push(wordObj);
         }
 
 
@@ -1004,7 +1047,7 @@
     }
 
 
-    // 下一题处理 - 修改为保存当前题目位置
+    // 下一题处理
     function nextQuestion() {
       // 保存当前进度
       saveCurrentProgress();
@@ -1031,7 +1074,7 @@
     }
 
 
-    // 上一题 - 修改为保存当前题目位置
+    // 上一题
     function prevQuestion() {
       if (isReviewMode) {
         if (currentReviewIndex > 0) {
@@ -1049,7 +1092,7 @@
     }
 
 
-    // 跳过当前题 - 修改为保存当前题目位置
+    // 跳过当前题
     function submitAnswer() {
       if (isReviewMode) {
         currentReviewIndex++;
@@ -1088,9 +1131,9 @@
       const lesson = getCurrentLesson();
       const currentWord = lesson.words[currentIndex];
       
-      wrongList[currentFile] = wrongList[currentFile] || [];
-      if (!wrongList[currentFile].some(w => w.word.toLowerCase() === currentWord.word.toLowerCase())) {
-        wrongList[currentFile].push(currentWord);
+      // 添加到错题本（去重）
+      if (!wrongList.some(w => w.word.toLowerCase() === currentWord.word.toLowerCase())) {
+        wrongList.push(currentWord);
       }
       
       currentStreak = 0;
@@ -1105,24 +1148,21 @@
       inPuzzle = true;
       const lesson = getCurrentLesson();
       
-      // 初始化当前文件的谜题使用记录
-      puzzleQuestionsUsed[currentFile] = puzzleQuestionsUsed[currentFile] || [];
-      
       // 选择未使用的谜题
       let availablePuzzles = puzzleQuestions.filter((_, index) => 
-        !puzzleQuestionsUsed[currentFile].includes(index)
+        !puzzleQuestionsUsed.includes(index)
       );
       
       // 如果所有谜题都用过了，重置
       if (availablePuzzles.length === 0) {
         availablePuzzles = puzzleQuestions;
-        puzzleQuestionsUsed[currentFile] = [];
+        puzzleQuestionsUsed = [];
       }
       
       // 随机选择一个谜题
       const puzzleIndex = Math.floor(Math.random() * availablePuzzles.length);
       const puzzle = availablePuzzles[puzzleIndex];
-      puzzleQuestionsUsed[currentFile].push(puzzleQuestions.indexOf(puzzle));
+      puzzleQuestionsUsed.push(puzzleQuestions.indexOf(puzzle));
 
 
       // 显示谜题
@@ -1194,9 +1234,8 @@
         dom.correctSound.play();
         
         // 奖励星星
-        lessonStars[currentFile] = lessonStars[currentFile] || {};
-        lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
-        dom.result.textContent += ` 当前课时星星：${lessonStars[currentFile][currentLessonId]}/3 ⭐`;
+        lessonStars[currentLessonId] = Math.min((lessonStars[currentLessonId] || 0) + 1, 3);
+        dom.result.textContent += ` 当前课时星星：${lessonStars[currentLessonId]}/3 ⭐`;
       } else {
         dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
         dom.result.textContent = `❌ 正确答案是：${puzzle.answer}`;
@@ -1261,7 +1300,7 @@
         
         // 获取当前单词（转为小写）
         const currentWord = isReviewMode 
-          ? (wrongList[currentFile] || [])[currentReviewIndex].word.toLowerCase()
+          ? wrongList[currentReviewIndex].word.toLowerCase()
           : getCurrentLesson().words[currentIndex].word.toLowerCase();
         
         // 检查语音是否匹配单词（包括变体）
@@ -1278,9 +1317,7 @@
             setTimeout(() => {
               // 移除错题（如果在复习模式）
               if (isReviewMode) {
-                wrongList[currentFile] = (wrongList[currentFile] || []).filter(
-                  w => w.word.toLowerCase() !== currentWord
-                );
+                wrongList = wrongList.filter(w => w.word.toLowerCase() !== currentWord);
               }
               
               nextQuestion();
@@ -1321,18 +1358,19 @@
     }
 
 
-    // 保存当前进度 - 关键修改：保存currentFile、currentLessonId和currentIndex
+    // 保存当前进度 - 核心修改：按单词库独立保存
     function saveCurrentProgress() {
-      gameData = { 
-        ...gameData, 
-        currentFile,        // 保存当前单词库
-        currentLessonId,    // 保存当前课时ID
-        currentIndex,       // 保存当前题目位置
-        lessonStars, 
-        wrongList, 
-        puzzleQuestionsUsed 
+      // 更新当前单词库的数据
+      allGameData[currentFile] = {
+        currentLessonId,
+        currentIndex,
+        lessonStars,
+        wrongList,
+        puzzleQuestionsUsed
       };
-      localStorage.setItem('wordGameData', JSON.stringify(gameData));
+      
+      // 保存到localStorage
+      localStorage.setItem('wordGameData', JSON.stringify(allGameData));
     }
 
 
@@ -1373,55 +1411,30 @@
     }
 
 
-    // 重置进度
-	function resetProgress() {
-	  if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-		// 1. 清除当前文件的所有数据
-		lessonStars = {...lessonStars};
-		delete lessonStars[currentFile]; // 清除当前文件星级
-		
-		wrongList = {...wrongList};
-		wrongList[currentFile] = []; // 清空当前文件错题
-		
-		puzzleQuestionsUsed = {...puzzleQuestionsUsed};
-		puzzleQuestionsUsed[currentFile] = []; // 清空已用谜题
-		
-		// 2. 重置进度变量
-		currentIndex = 0;
-		currentStreak = 0;
-		answerCorrect = false;
-		inPuzzle = false;
-		inRewardPuzzle = false;
-		isReviewMode = false;
-		currentReviewIndex = 0;
-		
-		// 3. 重置当前课时为第一课时
-		const file = lessonWordLists[currentFile];
-		if (file.lessons.length > 0) {
-		  currentLessonId = file.lessons[0].id;
-		}
-		
-		// 4. 保存重置后的状态
-		saveCurrentProgress();
-		
-		// 5. 刷新界面
-		document.getElementById("lessonSelect").value = currentLessonId;
-		loadCurrentLesson();
-		updateStats();
-		
-		// 6. 清空输入框
-		const inputs = dom.letterBox.querySelectorAll("input");
-		inputs.forEach(input => {
-		  input.value = '';
-		  input.className = 'word-input';
-		});
-		dom.letterBox.querySelector("input")?.focus();
-		
-		// 7. 显示提示
-		dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
-		dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
-	  }
-	}
+    // 重置进度 - 只重置当前单词库
+    function resetProgress() {
+      if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
+        // 重置当前单词库的数据
+        const file = lessonWordLists[currentFile];
+        currentLessonId = file.lessons.length > 0 ? file.lessons[0].id : 1;
+        currentIndex = 0;
+        lessonStars = {};
+        wrongList = [];
+        puzzleQuestionsUsed = [];
+        
+        // 保存重置后的状态
+        saveCurrentProgress();
+        
+        // 刷新界面
+        dom.lessonSelect.value = currentLessonId;
+        loadCurrentLesson();
+        updateStats();
+        
+        // 显示提示
+        dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
+        dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
+      }
+    }
 
 
     // 语音朗读功能
@@ -1433,7 +1446,7 @@
       
       // 获取当前单词
       const currentWord = isReviewMode 
-        ? (wrongList[currentFile] || [])[currentReviewIndex].word
+        ? wrongList[currentReviewIndex].word
         : getCurrentLesson().words[currentIndex].word;
       
       // 创建语音合成实例
@@ -1460,7 +1473,7 @@
     function calculateSimilarity(s1, s2) {
       if (s1 === s2) return 1;
       const longer = s1.length > s2.length ? s1 : s2;
-      const shorter = s1.length > s2.length ? s2 : s1;
+      const shorter = s1.length > s2.length ? s2 : s1; s2 : s1;
       const longerLen = longer.length;
       if (longerLen === 0) return 1.0;
       
