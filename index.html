@@ -170,7 +170,6 @@
             <div class="select-wrapper">
               <select id="wordFileSelect" class="custom-select">
                 <option value="default">默认单词库</option>
-                <option value="two">二年级单词</option>
                 <option value="threesh">三年级上单词</option>
                 <option value="basic">新概念1词库</option>
               </select>
@@ -355,12 +354,6 @@
         isCustom: false,
         loaded: true
       },
-      "two": {
-        name: "二年级单词",
-        lessons: [],
-        isCustom: true,
-        loaded: false
-      },
        "threesh": {
         name: "三年级上单词",
         lessons: [],
@@ -452,13 +445,6 @@
     const defaultGameData = {
       // 每个单词库的独立数据
       "default": {
-        currentLessonId: 1,
-        currentIndex: 0,
-        lessonStars: {},
-        wrongList: [],
-        puzzleQuestionsUsed: []
-      },
-      "two": {
         currentLessonId: 1,
         currentIndex: 0,
         lessonStars: {},
@@ -610,7 +596,6 @@
       
       // 词库文件路径
       const fileName = {
-        "two": "two_words.txt",
         "threesh": "threeshang_words.txt",
         "basic": "basic_words.txt"
       }[currentFile];
