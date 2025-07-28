@@ -537,81 +537,90 @@
       }
     }
 
-
-    // 加载单词文件 - 修改为保存当前单词库
-    function loadSelectedWordFile() {
-      const selectedFile = dom.wordFileSelect.value;
-      if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
-      
-      saveCurrentProgress();  // 保存当前进度
-      currentFile = selectedFile;  // 更新当前单词库
-      dom.fileNotification.textContent = "";
-      
-      const file = lessonWordLists[currentFile];
+	// 加载单词文件 - 修改为保存当前单词库
+	function loadSelectedWordFile() {
+	  const selectedFile = dom.wordFileSelect.value;
+	  if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
 	  
-      // 切换文件时重置当前课时ID和索引
-      if (file.lessons.length > 0) {
-        currentLessonId = file.lessons[0].id;
-        currentIndex = 0;
-      }
-      
-      // 初始化当前文件的错题列表（如果不存在）
-      if (!wrongList[currentFile]) {
-        wrongList[currentFile] = [];
-      }
-      
-      // 初始化当前文件的谜题使用记录（如果不存在）
-      if (!puzzleQuestionsUsed[currentFile]) {
-        puzzleQuestionsUsed[currentFile] = [];
-      }
-      
-      // 如果文件已加载，直接更新界面
-      if (file.loaded) {
-        updateLessonSelector();
-        return;
-      }
-      
-      // 否则加载文件
-      dom.fileNotification.textContent = `正在加载 ${file.name}...`;
-      
-      // 词库文件路径
-      const fileName = {
-        "two": "two_words.txt",
-        "threesh": "threeshang_words.txt",
-        "basic": "basic_words.txt"
-      }[currentFile];
+	  saveCurrentProgress();  // 保存当前进度
+	  currentFile = selectedFile;  // 更新当前单词库
+	  dom.fileNotification.textContent = "";
+	  
+	  const file = lessonWordLists[currentFile];
+	  
+	  // 从localStorage中获取当前单词库的学习记录
+	  const savedData = JSON.parse(localStorage.getItem('wordGameData')) || {};
+	  const fileData = savedData[currentFile];
+	  if (fileData) {
+		currentLessonId = fileData.currentLessonId;
+		currentIndex = fileData.currentIndex;
+		lessonStars[currentFile] = fileData.lessonStars;
+		wrongList[currentFile] = fileData.wrongList;
+		puzzleQuestionsUsed[currentFile] = fileData.puzzleQuestionsUsed;
+	  } else {
+		// 如果没有保存的记录，才重置为第一个课时和0
+		if (file.lessons.length > 0) {
+		  currentLessonId = file.lessons[0].id;
+		  currentIndex = 0;
+		}
+	  }
+	  
+	  // 初始化当前文件的错题列表（如果不存在）
+	  if (!wrongList[currentFile]) {
+		wrongList[currentFile] = [];
+	  }
+	  
+	  // 初始化当前文件的谜题使用记录（如果不存在）
+	  if (!puzzleQuestionsUsed[currentFile]) {
+		puzzleQuestionsUsed[currentFile] = [];
+	  }
+	  
+	  // 如果文件已加载，直接更新界面
+	  if (file.loaded) {
+		updateLessonSelector();
+		return;
+	  }
+	  
+	  // 否则加载文件
+	  dom.fileNotification.textContent = `正在加载 ${file.name}...`;
+	  
+	  // 词库文件路径
+	  const fileName = {
+		"two": "two_words.txt",
+		"threesh": "threeshang_words.txt",
+		"basic": "basic_words.txt"
+	  }[currentFile];
 
-
-      // 读取并解析带课时的TXT文件
-      fetch(fileName)
-        .then(response => {
-          if (!response.ok) throw new Error("文件不存在或加载失败");
-          return response.text();
-        })
-        .then(text => {
-          const lessons = parseLessonFile(text);
-          
-          if (lessons.length === 0) {
-            throw new Error("未解析到有效课时，请检查文件格式");
-          }
-          
-          // 加载成功，更新数据
-          lessonWordLists[currentFile].lessons = lessons;
-          lessonWordLists[currentFile].loaded = true;
-          dom.fileNotification.textContent = `加载成功！共 ${lessons.length} 个课时，${lessons.reduce((total, lesson) => total + lesson.words.length, 0)} 个单词`;
-          
-          // 更新统计信息显示
-          document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
-          document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
-          
-          // 更新课时选择器
-          updateLessonSelector();
-        })
-        .catch(error => {
-          dom.fileNotification.textContent = `加载失败：${error.message}`;
-          console.error("词库加载错误：", error);
-        });
-    }
+	  // 读取并解析带课时的TXT文件
+	  fetch(fileName)
+	   .then(response => {
+		  if (!response.ok) throw new Error("文件不存在或加载失败");
+		  return response.text();
+		})
+	   .then(text => {
+		  const lessons = parseLessonFile(text);
+		  
+		  if (lessons.length === 0) {
+			throw new Error("未解析到有效课时，请检查文件格式");
+		  }
+		  
+		  // 加载成功，更新数据
+		  lessonWordLists[currentFile].lessons = lessons;
+		  lessonWordLists[currentFile].loaded = true;
+		  dom.fileNotification.textContent = `加载成功！共 ${lessons.length} 个课时，${lessons.reduce((total, lesson) => total + lesson.words.length, 0)} 个单词`;
+		  
+		  // 更新统计信息显示
+		  document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
+		  document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
+		  
+		  // 更新课时选择器
+		  updateLessonSelector();
+		})
+	   .catch(error => {
+		  dom.fileNotification.textContent = `加载失败：${error.message}`;
+		  console.error("词库加载错误：", error);
+		});
+	}
 
 
     // 解析带课时的词库文件
@@ -1321,19 +1330,30 @@
     }
 
 
-    // 保存当前进度 - 关键修改：保存currentFile、currentLessonId和currentIndex
-    function saveCurrentProgress() {
-      gameData = { 
-        ...gameData, 
-        currentFile,        // 保存当前单词库
-        currentLessonId,    // 保存当前课时ID
-        currentIndex,       // 保存当前题目位置
-        lessonStars, 
-        wrongList, 
-        puzzleQuestionsUsed 
-      };
-      localStorage.setItem('wordGameData', JSON.stringify(gameData));
-    }
+	// 保存当前进度
+	function saveCurrentProgress() {
+	  // 确保lessonStars、wrongList、puzzleQuestionsUsed存在
+	  lessonStars[currentFile] = lessonStars[currentFile] || {};
+	  wrongList[currentFile] = wrongList[currentFile] || [];
+	  puzzleQuestionsUsed[currentFile] = puzzleQuestionsUsed[currentFile] || [];
+	  
+	  // 构建要保存的数据对象，以单词库名称为键，保存对应单词库的学习记录
+	  const saveData = {
+		[currentFile]: {
+		  currentLessonId,
+		  currentIndex,
+		  lessonStars: lessonStars[currentFile],
+		  wrongList: wrongList[currentFile],
+		  puzzleQuestionsUsed: puzzleQuestionsUsed[currentFile]
+		}
+	  };
+	  
+	  // 合并之前保存的数据（如果有）
+	  const existingData = JSON.parse(localStorage.getItem('wordGameData')) || {};
+	  const combinedData = {...existingData,...saveData };
+	  
+	  localStorage.setItem('wordGameData', JSON.stringify(combinedData));
+	}
 
 
     // 显示奖励
