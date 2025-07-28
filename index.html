@@ -435,16 +435,8 @@
     };
 
 
-    // 连续正确奖励配置
+    // 连续正确奖励配置（已删除3题星星奖励）
     const streakRewards = {
-      3: {
-        description: "获得额外星星！",
-        action: () => {
-          lessonStars[currentFile] = lessonStars[currentFile] || {};
-          lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
-          return `当前课时星星：${lessonStars[currentFile][currentLessonId]}/3 ⭐`;
-        }
-      },
       5: {
         description: "挑战奖励谜题赢取额外积分！",
         action: () => {
@@ -1186,29 +1178,14 @@ function parseLessonFile(text) {
         dom.result.textContent = "🎉 恭喜你答对了！获得额外奖励！";
         dom.correctSound.play();
         
-        // 奖励星星
+        // 奖励星星（保持星星系统，但不与连续3题关联）
         lessonStars[currentFile] = lessonStars[currentFile] || {};
         lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
-        
-        // 奖励谜题完成后继续当前课时
-        if (isRewardPuzzle) {
-          setTimeout(() => {
-            inRewardPuzzle = false;
-            nextQuestion();
-          }, 2000);
-        }
+        dom.result.textContent += ` 当前课时星星：${lessonStars[currentFile][currentLessonId]}/3 ⭐`;
       } else {
         dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
         dom.result.textContent = `❌ 正确答案是：${puzzle.answer}`;
         dom.wrongSound.play();
-        
-        // 奖励谜题答错也继续当前课时
-        if (isRewardPuzzle) {
-          setTimeout(() => {
-            inRewardPuzzle = false;
-            nextQuestion();
-          }, 2000);
-        }
       }
 
 
@@ -1237,6 +1214,12 @@ function parseLessonFile(text) {
           
           // 更新课时选择器
           dom.lessonSelect.value = currentLessonId;
+        }, 2000);
+      } else {
+        // 奖励谜题的处理
+        setTimeout(() => {
+          inRewardPuzzle = false;
+          nextQuestion();
         }, 2000);
       }
     }
