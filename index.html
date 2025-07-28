@@ -376,7 +376,7 @@
     };
 
 
-    // 关卡谜题（扩展到33题）
+    // 关卡谜题
     const puzzleQuestions = [
       { question: "“日出大米”猜一个字？", options: ["明", "昌", "早", "亮"], answer: "昌" },
       { question: "什么东西越洗越脏？", options: ["衣服", "手", "水", "地板"], answer: "水" },
@@ -435,7 +435,7 @@
     };
 
 
-    // 连续正确奖励配置（已删除3题星星奖励）
+    // 连续正确奖励配置
     const streakRewards = {
       5: {
         description: "挑战奖励谜题赢取额外积分！",
@@ -448,29 +448,37 @@
     };
 
 
-    // 游戏核心变量
-    let currentFile = "default";
-    let currentLessonId = 1;
+    // 游戏核心变量 - 从localStorage恢复或初始化
     let gameData = JSON.parse(localStorage.getItem('wordGameData')) || {
-      currentIndex: 0, 
-      lessonStars: {}, // 按文件和课时保存星级 {file: {lessonId: stars}}
-      wrongList: {},   // 按文件保存错题 {file: [words]}
-      puzzleQuestionsUsed: {} // 按文件保存已使用的谜题 {file: [indices]}
+      currentFile: "default",      // 保存当前单词库
+      currentLessonId: 1,          // 保存当前课时ID
+      currentIndex: 0,             // 保存当前题目位置
+      lessonStars: {},             // 按文件和课时保存星级 {file: {lessonId: stars}}
+      wrongList: {},               // 按文件保存错题 {file: [words]}
+      puzzleQuestionsUsed: {}      // 按文件保存已使用的谜题 {file: [indices]}
     };
 
 
-    // 内存变量
-    let { currentIndex, lessonStars, wrongList, puzzleQuestionsUsed } = gameData;
+    // 内存变量 - 从gameData初始化
+    let { 
+      currentFile, 
+      currentLessonId, 
+      currentIndex, 
+      lessonStars, 
+      wrongList, 
+      puzzleQuestionsUsed 
+    } = gameData;
+    
     let inPuzzle = false;
-    let inRewardPuzzle = false; // 新增：标记是否在奖励谜题中
+    let inRewardPuzzle = false;
     let isReviewMode = false;
     let currentStreak = 0;
     let currentReviewIndex = 0;
     let recognition;
     let isListening = false;
-    let answerCorrect = false; // 标记答案是否正确
-    let speechSynthAvailable = false; // 语音合成可用状态
-    let rewardPuzzleIndex = -1; // 记录当前奖励谜题索引
+    let answerCorrect = false;
+    let speechSynthAvailable = false;
+    let rewardPuzzleIndex = -1;
 
 
     // DOM元素缓存
@@ -495,17 +503,21 @@
       wrongSound: document.getElementById("wrong-sound"),
       rewardSound: document.getElementById("reward-sound"),
       readWordBtn: document.querySelector('button[onclick="readWord()"]'),
-      lessonSelect: document.getElementById("lessonSelect")
+      lessonSelect: document.getElementById("lessonSelect"),
+      wordFileSelect: document.getElementById("wordFileSelect")
     };
 
 
     // 初始化
     function init() {
+      // 设置单词库选择器的选中值为保存的值
+      dom.wordFileSelect.value = currentFile;
+      
       // 初始化事件监听
-      document.getElementById("wordFileSelect").addEventListener('change', loadSelectedWordFile);
+      dom.wordFileSelect.addEventListener('change', loadSelectedWordFile);
       dom.lessonSelect.addEventListener('change', changeLesson);
       
-      // 加载默认文件
+      // 加载保存的单词库
       loadSelectedWordFile();
       initSpeechRecognition();
       checkSpeechSynthesis();
@@ -526,18 +538,18 @@
     }
 
 
-    // 加载单词文件
+    // 加载单词文件 - 修改为保存当前单词库
     function loadSelectedWordFile() {
-      const selectedFile = document.getElementById("wordFileSelect").value;
+      const selectedFile = dom.wordFileSelect.value;
       if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
       
-      saveCurrentProgress();
-      currentFile = selectedFile;
+      saveCurrentProgress();  // 保存当前进度
+      currentFile = selectedFile;  // 更新当前单词库
       dom.fileNotification.textContent = "";
       
       const file = lessonWordLists[currentFile];
 	  
-      // 新增：切换文件时重置当前课时ID
+      // 切换文件时重置当前课时ID和索引
       if (file.lessons.length > 0) {
         currentLessonId = file.lessons[0].id;
         currentIndex = 0;
@@ -603,66 +615,66 @@
 
 
     // 解析带课时的词库文件
-function parseLessonFile(text) {
-  const lessons = [];
-  let currentLesson = { id: 1, name: "第1课", words: [] };
-  let currentLessonId = 1;
-  let currentLessonName = `第${currentLessonId}课`;
+    function parseLessonFile(text) {
+      const lessons = [];
+      let currentLesson = { id: 1, name: "第1课", words: [] };
+      let currentLessonId = 1;
+      let currentLessonName = `第${currentLessonId}课`;
 
 
-  // 按行分割，过滤空行和无效行
-  const lines = text.split('\n')
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith('//')); // 忽略注释行
+      // 按行分割，过滤空行和无效行
+      const lines = text.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('//')); // 忽略注释行
 
 
-  lines.forEach(line => {
-    // 检测课时分隔符（支持"LessonX"和"LessonX:XXXXXX"两种格式）
-    const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
-    if (lessonMatch) {
-      // 保存当前课时（如果有单词）
+      lines.forEach(line => {
+        // 检测课时分隔符
+        const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
+        if (lessonMatch) {
+          // 保存当前课时（如果有单词）
+          if (currentLesson.words.length > 0) {
+            lessons.push(currentLesson);
+          }
+          // 创建新课时
+          currentLessonId = parseInt(lessonMatch[1]);
+          currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
+          currentLesson = {
+            id: currentLessonId,
+            name: currentLessonName,
+            words: []
+          };
+        } else {
+          // 解析单词行
+          const parts = line.split(',').map(p => p.trim());
+          if (parts.length >= 2) {
+            // 支持两种格式：
+            // 1. word,definition,phonetic
+            // 2. 序号,word,definition,phonetic
+            const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
+            if (wordIndex < parts.length) {
+              currentLesson.words.push({
+                word: parts[wordIndex],
+                definition: parts[wordIndex + 1],
+                phonetic: parts[wordIndex + 2] || '无'
+              });
+            }
+          }
+        }
+      });
+
+
+      // 添加最后一个课时
       if (currentLesson.words.length > 0) {
         lessons.push(currentLesson);
       }
-      // 创建新课时
-      currentLessonId = parseInt(lessonMatch[1]);
-      currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
-      currentLesson = {
-        id: currentLessonId,
-        name: currentLessonName,
-        words: []
-      };
-    } else {
-      // 解析单词行
-      const parts = line.split(',').map(p => p.trim());
-      if (parts.length >= 2) {
-        // 支持两种格式：
-        // 1. word,definition,phonetic
-        // 2. 序号,word,definition,phonetic
-        const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
-        if (wordIndex < parts.length) {
-          currentLesson.words.push({
-            word: parts[wordIndex],
-            definition: parts[wordIndex + 1],
-            phonetic: parts[wordIndex + 2] || '无'
-          });
-        }
-      }
+
+
+      return lessons;
     }
-  });
 
 
-  // 添加最后一个课时
-  if (currentLesson.words.length > 0) {
-    lessons.push(currentLesson);
-  }
-
-
-  return lessons;
-}
-
-
-    // 更新课时选择器
+    // 更新课时选择器 - 选中保存的课时
     function updateLessonSelector() {
       const file = lessonWordLists[currentFile];
       const lessonSelect = dom.lessonSelect;
@@ -685,6 +697,7 @@ function parseLessonFile(text) {
         currentIndex = 0;
       }
       
+      // 设置选中的课时为保存的值
       lessonSelect.value = currentLessonId;
       
       // 加载当前课时
@@ -692,7 +705,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 切换课时
+    // 切换课时 - 修改为保存当前课时
     function changeLesson() {
       const selectedLessonId = parseInt(dom.lessonSelect.value);
       if (selectedLessonId === currentLessonId) return;
@@ -991,7 +1004,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 下一题处理
+    // 下一题处理 - 修改为保存当前题目位置
     function nextQuestion() {
       // 保存当前进度
       saveCurrentProgress();
@@ -1018,7 +1031,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 上一题
+    // 上一题 - 修改为保存当前题目位置
     function prevQuestion() {
       if (isReviewMode) {
         if (currentReviewIndex > 0) {
@@ -1030,11 +1043,13 @@ function parseLessonFile(text) {
         if (currentStreak > 0) currentStreak--;
       }
       
+      // 保存进度
+      saveCurrentProgress();
       loadCurrentLesson();
     }
 
 
-    // 跳过当前题
+    // 跳过当前题 - 修改为保存当前题目位置
     function submitAnswer() {
       if (isReviewMode) {
         currentReviewIndex++;
@@ -1056,7 +1071,7 @@ function parseLessonFile(text) {
         
         currentIndex = 0;
         inPuzzle = false;
-        saveCurrentProgress();
+        saveCurrentProgress();  // 保存进度
         loadCurrentLesson();
         return;
       }
@@ -1080,7 +1095,7 @@ function parseLessonFile(text) {
       
       currentStreak = 0;
       currentIndex++;
-      saveCurrentProgress();
+      saveCurrentProgress();  // 保存进度
       loadCurrentLesson();
     }
 
@@ -1129,7 +1144,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 显示连续答对奖励谜题（新增功能）
+    // 显示连续答对奖励谜题
     function showRewardPuzzle() {
       inRewardPuzzle = true;
       const lesson = getCurrentLesson();
@@ -1159,7 +1174,7 @@ function parseLessonFile(text) {
     }
 
 
-    // 检查谜题答案（修改为支持奖励谜题）
+    // 检查谜题答案
     function checkPuzzleAnswer(puzzle, selected, isRewardPuzzle) {
       const buttons = dom.options.querySelectorAll("button");
       buttons.forEach(btn => {
@@ -1178,7 +1193,7 @@ function parseLessonFile(text) {
         dom.result.textContent = "🎉 恭喜你答对了！获得额外奖励！";
         dom.correctSound.play();
         
-        // 奖励星星（保持星星系统，但不与连续3题关联）
+        // 奖励星星
         lessonStars[currentFile] = lessonStars[currentFile] || {};
         lessonStars[currentFile][currentLessonId] = Math.min((lessonStars[currentFile][currentLessonId] || 0) + 1, 3);
         dom.result.textContent += ` 当前课时星星：${lessonStars[currentFile][currentLessonId]}/3 ⭐`;
@@ -1210,6 +1225,7 @@ function parseLessonFile(text) {
           
           currentIndex = 0;
           inPuzzle = false;
+          saveCurrentProgress();  // 保存进度
           loadCurrentLesson();
           
           // 更新课时选择器
@@ -1305,9 +1321,17 @@ function parseLessonFile(text) {
     }
 
 
-    // 保存当前进度
+    // 保存当前进度 - 关键修改：保存currentFile、currentLessonId和currentIndex
     function saveCurrentProgress() {
-      gameData = { ...gameData, currentIndex, lessonStars, wrongList, puzzleQuestionsUsed };
+      gameData = { 
+        ...gameData, 
+        currentFile,        // 保存当前单词库
+        currentLessonId,    // 保存当前课时ID
+        currentIndex,       // 保存当前题目位置
+        lessonStars, 
+        wrongList, 
+        puzzleQuestionsUsed 
+      };
       localStorage.setItem('wordGameData', JSON.stringify(gameData));
     }
 
@@ -1352,8 +1376,7 @@ function parseLessonFile(text) {
     // 重置进度
 	function resetProgress() {
 	  if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-		// 1. 彻底清除当前文件的所有数据（深度重置）
-		// 复制一份干净的对象，打破原引用关系
+		// 1. 清除当前文件的所有数据
 		lessonStars = {...lessonStars};
 		delete lessonStars[currentFile]; // 清除当前文件星级
 		
@@ -1363,12 +1386,12 @@ function parseLessonFile(text) {
 		puzzleQuestionsUsed = {...puzzleQuestionsUsed};
 		puzzleQuestionsUsed[currentFile] = []; // 清空已用谜题
 		
-		// 2. 重置所有进度变量
+		// 2. 重置进度变量
 		currentIndex = 0;
 		currentStreak = 0;
 		answerCorrect = false;
 		inPuzzle = false;
-		inRewardPuzzle = false; // 重置奖励谜题状态
+		inRewardPuzzle = false;
 		isReviewMode = false;
 		currentReviewIndex = 0;
 		
@@ -1378,25 +1401,15 @@ function parseLessonFile(text) {
 		  currentLessonId = file.lessons[0].id;
 		}
 		
-		// 4. 强制更新gameData并同步到本地存储
-		gameData = {
-		  ...gameData,
-		  currentIndex,
-		  lessonStars,
-		  wrongList,
-		  puzzleQuestionsUsed,
-		  currentLessonId // 新增：保存当前课时ID
-		};
-		// 彻底清除并重新设置localStorage
-		localStorage.removeItem('wordGameData');
-		localStorage.setItem('wordGameData', JSON.stringify(gameData));
+		// 4. 保存重置后的状态
+		saveCurrentProgress();
 		
-		// 5. 强制刷新课时选择器和界面
+		// 5. 刷新界面
 		document.getElementById("lessonSelect").value = currentLessonId;
-		loadCurrentLesson(); // 重新加载第一课时
-		updateStats(); // 强制更新统计
+		loadCurrentLesson();
+		updateStats();
 		
-		// 6. 清空输入框并重置焦点
+		// 6. 清空输入框
 		const inputs = dom.letterBox.querySelectorAll("input");
 		inputs.forEach(input => {
 		  input.value = '';
@@ -1404,7 +1417,7 @@ function parseLessonFile(text) {
 		});
 		dom.letterBox.querySelector("input")?.focus();
 		
-		// 7. 显示重置成功提示
+		// 7. 显示提示
 		dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
 		dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
 	  }
