@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>单词拼写游戏V3.4 - 按课时学习</title>
+  <title>单词拼写游戏V3.5 - 按课时学习</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <script>
@@ -144,6 +144,19 @@
       .word-input.highlight {
         animation: highlight 1s ease;
       }
+      /* 发音选择按钮样式 */
+      .pronunciation-selector {
+        @apply flex items-center justify-center gap-2 mb-4;
+      }
+      .pronunciation-btn {
+        @apply px-3 py-1 rounded-md text-sm font-medium transition-all duration-300;
+      }
+      .pronunciation-btn.active {
+        @apply bg-primary text-white;
+      }
+      .pronunciation-btn:not(.active) {
+        @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+      }
     }
   </style>
 </head>
@@ -185,6 +198,17 @@
               </select>
             </div>
           </div>
+        </div>
+        
+        <!-- 发音选择器 -->
+        <div class="pronunciation-selector">
+          <label class="text-sm font-medium text-gray-700">发音选择：</label>
+          <button id="ukPronunciation" class="pronunciation-btn active" onclick="setPronunciation('uk')">
+            <i class="fa fa-flag mr-1"></i> 英式
+          </button>
+          <button id="usPronunciation" class="pronunciation-btn" onclick="setPronunciation('us')">
+            <i class="fa fa-flag mr-1"></i> 美式
+          </button>
         </div>
         
         <!-- 操作按钮区域 -->
@@ -293,7 +317,7 @@
 
     <!-- 底部信息 -->
     <div class="text-center text-gray-500 text-sm mt-6 animate-fade-in">
-      <p>单词拼写游戏 V3.4 ©___在路上 | 系统学习英语词汇</p>
+      <p>单词拼写游戏 V3.5 ©___在路上 | 系统学习英语词汇</p>
     </div>
   </div>
 
@@ -305,7 +329,7 @@
   <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
   <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
   <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
-  <audio id="oxford-audio" preload="none"></audio>
+  <audio id="pronunciation-audio" preload="none"></audio>
 
 
   <!-- 连续正确提示 -->
@@ -313,11 +337,16 @@
 
 
   <script>
-    // Oxford Dictionaries API 配置
-    const OXFORD_APP_ID = "BE22B666";
-    const OXFORD_APP_KEY = "B6444886A80BDC60359C3584510E44EE";
-    const OXFORD_API_URL = "https://od-api-sandbox.oxforddictionaries.com/api/v2";
+    // Oxford Dictionaries API配置
+    const OXFORD_API_CONFIG = {
+      baseUrl: 'https://od-api-sandbox.oxforddictionaries.com/api/v2',
+      appId: 'be22b666',
+      appKey: 'b6444886a80bdc60359c3584510e44ee',
+      defaultPronunciation: 'uk' // 默认英式发音
+    };
 
+    // 当前发音选择
+    let currentPronunciation = OXFORD_API_CONFIG.defaultPronunciation;
 
     // 按课时组织的核心单词库
     const lessonWordLists = {
@@ -504,7 +533,6 @@
     let recognition;
     let isListening = false;
     let answerCorrect = false;
-    let speechSynthAvailable = false;
     let rewardPuzzleIndex = -1;
 
 
@@ -532,7 +560,9 @@
       readWordBtn: document.querySelector('button[onclick="readWord()"]'),
       lessonSelect: document.getElementById("lessonSelect"),
       wordFileSelect: document.getElementById("wordFileSelect"),
-      oxfordAudio: document.getElementById("oxford-audio")
+      ukPronunciation: document.getElementById("ukPronunciation"),
+      usPronunciation: document.getElementById("usPronunciation"),
+      pronunciationAudio: document.getElementById("pronunciation-audio")
     };
 
 
@@ -548,21 +578,116 @@
       // 加载保存的单词库
       loadSelectedWordFile();
       initSpeechRecognition();
-      checkSpeechSynthesis();
+      
+      // 设置默认发音
+      setPronunciation(OXFORD_API_CONFIG.defaultPronunciation);
     }
 
 
-    // 检查语音合成支持
-    function checkSpeechSynthesis() {
-      if ('speechSynthesis' in window) {
-        speechSynthAvailable = true;
-        dom.readWordBtn.disabled = false;
-        dom.readWordBtn.title = "";
+    // 设置发音类型（英式/美式）
+    function setPronunciation(type) {
+      currentPronunciation = type;
+      
+      // 更新按钮样式
+      if (type === 'uk') {
+        dom.ukPronunciation.classList.add('active');
+        dom.usPronunciation.classList.remove('active');
       } else {
-        speechSynthAvailable = false;
-        dom.readWordBtn.disabled = true;
-        dom.readWordBtn.title = "您的浏览器不支持语音合成";
+        dom.ukPronunciation.classList.remove('active');
+        dom.usPronunciation.classList.add('active');
       }
+      
+      // 如果有当前单词，尝试播放新的发音
+      if (isReviewMode && wrongList.length > 0 && currentReviewIndex < wrongList.length) {
+        readWord();
+      } else {
+        const lesson = getCurrentLesson();
+        if (lesson && lesson.words.length > 0 && currentIndex < lesson.words.length) {
+          readWord();
+        }
+      }
+    }
+
+
+    // 从Oxford API获取单词发音并播放
+    function readWord() {
+      // 获取当前单词
+      const currentWord = isReviewMode 
+        ? wrongList[currentReviewIndex].word
+        : getCurrentLesson().words[currentIndex].word;
+      
+      if (!currentWord) return;
+      
+      // 显示加载状态
+      dom.result.textContent = `正在获取 "${currentWord}" 的${currentPronunciation === 'uk' ? '英式' : '美式'}发音...`;
+      
+      // 构建API请求URL
+      const url = `${OXFORD_API_CONFIG.baseUrl}/entries/en-gb/${encodeURIComponent(currentWord)}`;
+      
+      // 发送请求
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'app_id': OXFORD_API_CONFIG.appId,
+          'app_key': OXFORD_API_CONFIG.appKey
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`API请求失败: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 查找发音URL
+        let audioUrl = null;
+        
+        // 尝试找到指定类型的发音
+        if (data.results && data.results.length > 0) {
+          data.results.forEach(result => {
+            if (result.lexicalEntries) {
+              result.lexicalEntries.forEach(lexicalEntry => {
+                if (lexicalEntry.pronunciations) {
+                  // 查找匹配当前发音类型的音频
+                  const targetPronunciation = lexicalEntry.pronunciations.find(pron => 
+                    (currentPronunciation === 'uk' && pron.dialects && pron.dialects.includes('British English')) ||
+                    (currentPronunciation === 'us' && pron.dialects && pron.dialects.includes('American English'))
+                  );
+                  
+                  // 如果找到目标发音类型
+                  if (targetPronunciation && targetPronunciation.audioFile) {
+                    audioUrl = targetPronunciation.audioFile;
+                  } 
+                  // 如果没有找到目标类型，使用第一个可用发音
+                  else if (!audioUrl && lexicalEntry.pronunciations[0] && lexicalEntry.pronunciations[0].audioFile) {
+                    audioUrl = lexicalEntry.pronunciations[0].audioFile;
+                  }
+                }
+              });
+            }
+          });
+        }
+        
+        // 播放找到的发音
+        if (audioUrl) {
+          dom.pronunciationAudio.src = audioUrl;
+          dom.pronunciationAudio.play()
+            .then(() => {
+              dom.result.textContent = `正在播放 "${currentWord}" 的${currentPronunciation === 'uk' ? '英式' : '美式'}发音`;
+            })
+            .catch(error => {
+              dom.result.textContent = `播放失败: ${error.message}`;
+              console.error('音频播放错误:', error);
+            });
+        } else {
+          dom.result.textContent = `未找到 "${currentWord}" 的发音资源`;
+        }
+      })
+      .catch(error => {
+        dom.result.textContent = `获取发音失败: ${error.message}`;
+        console.error('API请求错误:', error);
+      });
     }
 
 
@@ -865,9 +990,7 @@
       generateInputBoxes(wordObj);
       
       // 自动朗读单词
-      if (speechSynthAvailable) {
-        setTimeout(readWord, 500);
-      }
+      setTimeout(readWord, 500);
       
       // 更新统计
       updateStats();
@@ -1430,108 +1553,11 @@
     }
 
 
-    // 使用Oxford Dictionaries API获取单词发音
-    function getOxfordPronunciation(word) {
-      return new Promise((resolve, reject) => {
-        // 构建API请求URL
-        const url = `${OXFORD_API_URL}/entries/en-us/${encodeURIComponent(word)}`;
-        
-        // 发送API请求
-        fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'app_id': OXFORD_APP_ID,
-            'app_key': OXFORD_APP_KEY
-          }
-        })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`API请求失败: ${response.statusText}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          // 从响应中提取发音URL
-          if (data && data.results && data.results.length > 0 &&
-              data.results[0].lexicalEntries && data.results[0].lexicalEntries.length > 0 &&
-              data.results[0].lexicalEntries[0].pronunciations && 
-              data.results[0].lexicalEntries[0].pronunciations.length > 0 &&
-              data.results[0].lexicalEntries[0].pronunciations[0].audioFile) {
-            
-            resolve(data.results[0].lexicalEntries[0].pronunciations[0].audioFile);
-          } else {
-            reject(new Error("未找到发音数据"));
-          }
-        })
-        .catch(error => {
-          console.error("Oxford API获取发音失败:", error);
-          reject(error);
-        });
-      });
-    }
-
-
-    // 语音朗读功能 - 优先使用Oxford API，失败则使用浏览器语音合成
-    function readWord() {
-      // 获取当前单词
-      const currentWord = isReviewMode 
-        ? wrongList[currentReviewIndex].word
-        : getCurrentLesson().words[currentIndex].word;
-      
-      // 先尝试使用Oxford API的发音
-      getOxfordPronunciation(currentWord)
-        .then(audioUrl => {
-          console.log(`使用Oxford API播放发音: ${currentWord}`);
-          // 设置音频源并播放
-          dom.oxfordAudio.src = audioUrl;
-          dom.oxfordAudio.play().catch(error => {
-            console.error("播放Oxford发音失败:", error);
-            // 播放失败则使用浏览器语音合成
-            fallbackToBrowserSpeech(currentWord);
-          });
-        })
-        .catch(() => {
-          // API调用失败则使用浏览器语音合成
-          fallbackToBrowserSpeech(currentWord);
-        });
-    }
-
-
-    // 浏览器语音合成作为备用方案
-    function fallbackToBrowserSpeech(word) {
-      if (!speechSynthAvailable) return;
-      
-      console.log(`使用浏览器语音合成播放: ${word}`);
-      
-      // 停止任何正在进行的语音合成
-      window.speechSynthesis.cancel();
-      
-      // 创建语音合成实例
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.9; // 稍微降低语速，便于学习
-      
-      // 设置朗读完成后的回调
-      utterance.onend = () => {
-        console.log(`朗读完成: ${word}`);
-      };
-      
-      utterance.onerror = (event) => {
-        console.error(`语音合成错误: ${event.error}`);
-        dom.result.textContent = "语音合成出错，请稍后再试";
-      };
-      
-      // 开始朗读
-      window.speechSynthesis.speak(utterance);
-    }
-
-
     // 计算字符串相似度
     function calculateSimilarity(s1, s2) {
       if (s1 === s2) return 1;
       const longer = s1.length > s2.length ? s1 : s2;
-      const shorter = s1.length > s2.length ? s2 : s1;
+      const shorter = s1.length > s2.length ? s2 : s1; s2 : s1;
       const longerLen = longer.length;
       if (longerLen === 0) return 1.0;
       
