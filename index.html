@@ -497,7 +497,6 @@
     let recognition;
     let isListening = false;
     let answerCorrect = false;
-    let speechSynthAvailable = false;
     let rewardPuzzleIndex = -1;
 
 
@@ -540,21 +539,6 @@
       // 加载保存的单词库
       loadSelectedWordFile();
       initSpeechRecognition();
-      checkSpeechSynthesis();
-    }
-
-
-    // 检查语音合成支持
-    function checkSpeechSynthesis() {
-      if ('speechSynthesis' in window) {
-        speechSynthAvailable = true;
-        dom.readWordBtn.disabled = false;
-        dom.readWordBtn.title = "";
-      } else {
-        speechSynthAvailable = false;
-        dom.readWordBtn.disabled = true;
-        dom.readWordBtn.title = "您的浏览器不支持语音合成";
-      }
     }
 
 
@@ -857,9 +841,7 @@
       generateInputBoxes(wordObj);
       
       // 自动朗读单词
-      if (speechSynthAvailable) {
-        setTimeout(readWord, 500);
-      }
+      setTimeout(readWord, 500);
       
       // 更新统计
       updateStats();
@@ -1422,35 +1404,49 @@
     }
 
 
-    // 语音朗读功能
+    // 语音朗读功能 - 使用VoiceRSS API实现真人发音
     function readWord() {
-      if (!speechSynthAvailable) return;
-      
-      // 停止任何正在进行的语音合成
-      window.speechSynthesis.cancel();
-      
       // 获取当前单词
       const currentWord = isReviewMode 
         ? wrongList[currentReviewIndex].word
         : getCurrentLesson().words[currentIndex].word;
+
+      // VoiceRSS API密钥（已填入您提供的密钥）
+      const apiKey = "78c480d4ac934976b877e13e5f122c75";
       
-      // 创建语音合成实例
-      const utterance = new SpeechSynthesisUtterance(currentWord);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.9; // 稍微降低语速，便于学习
+      // 发音参数配置
+      const params = {
+        key: apiKey,
+        src: currentWord,       // 要发音的单词
+        hl: "en-us",            // 语言（美式英语）
+        v: "Linda",             // 发音人（美式女声）
+        r: "0",                 // 语速（0-10，0为正常速度）
+        c: "mp3",               // 音频格式
+        f: "44khz_16bit_stereo" // 音频质量
+      };
+
+      // 构建API请求URL
+      const apiUrl = `https://api.voicerss.org/?${new URLSearchParams(params)}`;
+
+      // 创建音频元素并播放
+      const audio = new Audio();
+      audio.src = apiUrl;
       
-      // 设置朗读完成后的回调
-      utterance.onend = () => {
-        console.log(`朗读完成: ${currentWord}`);
+      // 播放前停止可能存在的其他音频
+      audio.onloadstart = () => {
+        const allAudios = document.getElementsByTagName("audio");
+        for (let a of allAudios) {
+          if (a !== audio) a.pause();
+        }
       };
       
-      utterance.onerror = (event) => {
-        console.error(`语音合成错误: ${event.error}`);
-        dom.result.textContent = "语音合成出错，请稍后再试";
+      // 播放错误处理
+      audio.onerror = () => {
+        dom.result.textContent = "发音加载失败，请重试";
       };
       
-      // 开始朗读
-      window.speechSynthesis.speak(utterance);
+      // 开始播放
+      audio.play();
     }
 
 
@@ -1458,7 +1454,7 @@
     function calculateSimilarity(s1, s2) {
       if (s1 === s2) return 1;
       const longer = s1.length > s2.length ? s1 : s2;
-      const shorter = s1.length > s2.length ? s2 : s1; s2 : s1;
+      const shorter = s1.length > s2.length ? s2 : s1;
       const longerLen = longer.length;
       if (longerLen === 0) return 1.0;
       
