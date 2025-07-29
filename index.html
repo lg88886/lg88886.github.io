@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>单词拼写游戏V3.5 - 按课时学习</title>
+  <title>单词拼写游戏V3.4 - 按课时学习</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <script>
@@ -144,19 +144,6 @@
       .word-input.highlight {
         animation: highlight 1s ease;
       }
-      /* 发音选择按钮样式 */
-      .pronunciation-selector {
-        @apply flex items-center justify-center gap-2 mb-4;
-      }
-      .pronunciation-btn {
-        @apply px-3 py-1 rounded-md text-sm font-medium transition-all duration-300;
-      }
-      .pronunciation-btn.active {
-        @apply bg-primary text-white;
-      }
-      .pronunciation-btn:not(.active) {
-        @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
-      }
     }
   </style>
 </head>
@@ -198,17 +185,6 @@
               </select>
             </div>
           </div>
-        </div>
-        
-        <!-- 发音选择器 -->
-        <div class="pronunciation-selector">
-          <label class="text-sm font-medium text-gray-700">发音选择：</label>
-          <button id="ukPronunciation" class="pronunciation-btn active" onclick="setPronunciation('uk')">
-            <i class="fa fa-flag mr-1"></i> 英式
-          </button>
-          <button id="usPronunciation" class="pronunciation-btn" onclick="setPronunciation('us')">
-            <i class="fa fa-flag mr-1"></i> 美式
-          </button>
         </div>
         
         <!-- 操作按钮区域 -->
@@ -317,7 +293,7 @@
 
     <!-- 底部信息 -->
     <div class="text-center text-gray-500 text-sm mt-6 animate-fade-in">
-      <p>单词拼写游戏 V3.5 ©___在路上 | 系统学习英语词汇</p>
+      <p>单词拼写游戏 V3.4 ©___在路上 | 系统学习英语词汇</p>
     </div>
   </div>
 
@@ -326,10 +302,9 @@
   <audio id="bgm" autoplay loop>
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
-  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
-  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
-  <audio id="pronunciation-audio" preload="none"></audio>
+  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></think>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
+  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
 
 
   <!-- 连续正确提示 -->
@@ -337,27 +312,6 @@
 
 
   <script>
-    // Murf.ai API配置 - 已更新为提供的API密钥
-    const MURF_API_CONFIG = {
-      baseUrl: 'https://api.murf.ai/v1/speech/generate',
-      apiKey: 'ap2_8abcda87-5557-43db-9b08-a20173e6df59',
-      // 语音模型映射：英式/美式发音
-      voices: {
-        'uk': {
-          // 英式英语语音模型ID
-          id: 'en-GB-1'
-        },
-        'us': {
-          // 美式英语语音模型ID
-          id: 'en-US-1'
-        }
-      },
-      defaultPronunciation: 'uk' // 默认英式发音
-    };
-
-    // 当前发音选择
-    let currentPronunciation = MURF_API_CONFIG.defaultPronunciation;
-
     // 按课时组织的核心单词库
     const lessonWordLists = {
       "default": {
@@ -543,6 +497,7 @@
     let recognition;
     let isListening = false;
     let answerCorrect = false;
+    let speechSynthAvailable = false;
     let rewardPuzzleIndex = -1;
 
 
@@ -569,10 +524,7 @@
       rewardSound: document.getElementById("reward-sound"),
       readWordBtn: document.querySelector('button[onclick="readWord()"]'),
       lessonSelect: document.getElementById("lessonSelect"),
-      wordFileSelect: document.getElementById("wordFileSelect"),
-      ukPronunciation: document.getElementById("ukPronunciation"),
-      usPronunciation: document.getElementById("usPronunciation"),
-      pronunciationAudio: document.getElementById("pronunciation-audio")
+      wordFileSelect: document.getElementById("wordFileSelect")
     };
 
 
@@ -588,94 +540,213 @@
       // 加载保存的单词库
       loadSelectedWordFile();
       initSpeechRecognition();
-      
-      // 设置默认发音
-      setPronunciation(MURF_API_CONFIG.defaultPronunciation);
+      checkSpeechSynthesis();
     }
 
 
-    // 设置发音类型（英式/美式）
-    function setPronunciation(type) {
-      currentPronunciation = type;
-      
-      // 更新按钮样式
-      if (type === 'uk') {
-        dom.ukPronunciation.classList.add('active');
-        dom.usPronunciation.classList.remove('active');
+    // 检查语音合成支持
+    function checkSpeechSynthesis() {
+      if ('speechSynthesis' in window) {
+        speechSynthAvailable = true;
+        dom.readWordBtn.disabled = false;
+        dom.readWordBtn.title = "";
       } else {
-        dom.ukPronunciation.classList.remove('active');
-        dom.usPronunciation.classList.add('active');
-      }
-      
-      // 如果有当前单词，尝试播放新的发音
-      if (isReviewMode && wrongList.length > 0 && currentReviewIndex < wrongList.length) {
-        readWord();
-      } else {
-        const lesson = getCurrentLesson();
-        if (lesson && lesson.words.length > 0 && currentIndex < lesson.words.length) {
-          readWord();
-        }
+        speechSynthAvailable = false;
+        dom.readWordBtn.disabled = true;
+        dom.readWordBtn.title = "您的浏览器不支持语音合成";
       }
     }
 
 
-    // 使用Murf.ai API生成单词发音并播放
-    function readWord() {
-      // 获取当前单词
-      const currentWord = isReviewMode 
-        ? wrongList[currentReviewIndex].word
-        : getCurrentLesson().words[currentIndex].word;
+    // 加载单词文件 - 核心修改：切换时加载对应单词库的历史数据
+    function loadSelectedWordFile() {
+      const selectedFile = dom.wordFileSelect.value;
+      if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
       
-      if (!currentWord) return;
+      // 保存当前单词库的进度
+      saveCurrentProgress();
       
-      // 显示加载状态
-      dom.result.textContent = `正在生成 "${currentWord}" 的${currentPronunciation === 'uk' ? '英式' : '美式'}发音...`;
+      // 切换到新的单词库
+      currentFile = selectedFile;
       
-      // 获取对应的语音模型
-      const voiceId = MURF_API_CONFIG.voices[currentPronunciation].id;
+      // 从全局数据中加载新单词库的历史数据
+      const fileData = allGameData[currentFile];
+      currentLessonId = fileData.currentLessonId;
+      currentIndex = fileData.currentIndex;
+      lessonStars = fileData.lessonStars;
+      wrongList = fileData.wrongList;
+      puzzleQuestionsUsed = fileData.puzzleQuestionsUsed;
       
-      // 构建API请求
-      const requestData = {
-        text: currentWord,
-        voiceId: voiceId,
-        format: "mp3",
-        sampleRate: 24000,
-        speed: 1.0
-      };
+      dom.fileNotification.textContent = "";
+      const file = lessonWordLists[currentFile];
       
-      // 发送请求生成语音
-      fetch(`${MURF_API_CONFIG.baseUrl}/text-to-speech`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `ApiKey ${MURF_API_CONFIG.apiKey}`
-        },
-        body: JSON.stringify(requestData)
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`API请求失败: ${response.status}`);
+      // 初始化当前文件的基础数据结构
+      if (!wrongList) wrongList = [];
+      if (!lessonStars) lessonStars = {};
+      if (!puzzleQuestionsUsed) puzzleQuestionsUsed = [];
+      
+      // 如果文件已加载，直接更新界面
+      if (file.loaded) {
+        updateLessonSelector();
+        return;
+      }
+      
+      // 否则加载文件
+      dom.fileNotification.textContent = `正在加载 ${file.name}...`;
+      
+      // 词库文件路径
+      const fileName = {
+        "threesh": "threeshang_words.txt",
+        "basic": "basic_words.txt"
+      }[currentFile];
+
+
+      // 读取并解析带课时的TXT文件
+      fetch(fileName)
+        .then(response => {
+          if (!response.ok) throw new Error("文件不存在或加载失败");
+          return response.text();
+        })
+        .then(text => {
+          const lessons = parseLessonFile(text);
+          
+          if (lessons.length === 0) {
+            throw new Error("未解析到有效课时，请检查文件格式");
+          }
+          
+          // 加载成功，更新数据
+          lessonWordLists[currentFile].lessons = lessons;
+          lessonWordLists[currentFile].loaded = true;
+          dom.fileNotification.textContent = `加载成功！共 ${lessons.length} 个课时，${lessons.reduce((total, lesson) => total + lesson.words.length, 0)} 个单词`;
+          
+          // 更新统计信息显示
+          document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
+          document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
+          
+          // 检查历史课时ID是否存在于当前单词库中，不存在则重置
+          const hasValidLesson = lessons.some(lesson => lesson.id === currentLessonId);
+          if (!hasValidLesson) {
+            currentLessonId = lessons[0].id;
+            currentIndex = 0;
+            saveCurrentProgress();
+          }
+          
+          // 更新课时选择器
+          updateLessonSelector();
+        })
+        .catch(error => {
+          dom.fileNotification.textContent = `加载失败：${error.message}`;
+          console.error("词库加载错误：", error);
+        });
+    }
+
+
+    // 解析带课时的词库文件
+    function parseLessonFile(text) {
+      const lessons = [];
+      let currentLesson = { id: 1, name: "第1课", words: [] };
+      let currentLessonId = 1;
+      let currentLessonName = `第${currentLessonId}课`;
+
+
+      // 按行分割，过滤空行和无效行
+      const lines = text.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('//')); // 忽略注释行
+
+
+      lines.forEach(line => {
+        // 检测课时分隔符
+        const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
+        if (lessonMatch) {
+          // 保存当前课时（如果有单词）
+          if (currentLesson.words.length > 0) {
+            lessons.push(currentLesson);
+          }
+          // 创建新课时
+          currentLessonId = parseInt(lessonMatch[1]);
+          currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
+          currentLesson = {
+            id: currentLessonId,
+            name: currentLessonName,
+            words: []
+          };
+        } else {
+          // 解析单词行
+          const parts = line.split(',').map(p => p.trim());
+          if (parts.length >= 2) {
+            // 支持两种格式：
+            // 1. word,definition,phonetic
+            // 2. 序号,word,definition,phonetic
+            const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
+            if (wordIndex < parts.length) {
+              currentLesson.words.push({
+                word: parts[wordIndex],
+                definition: parts[wordIndex + 1],
+                phonetic: parts[wordIndex + 2] || '无'
+              });
+            }
+          }
         }
-        return response.blob();
-      })
-      .then(audioBlob => {
-        // 创建音频URL并播放
-        const audioUrl = URL.createObjectURL(audioBlob);
-        dom.pronunciationAudio.src = audioUrl;
-        
-        dom.pronunciationAudio.play()
-          .then(() => {
-            dom.result.textContent = `正在播放 "${currentWord}" 的${currentPronunciation === 'uk' ? '英式' : '美式'}发音`;
-          })
-          .catch(error => {
-            dom.result.textContent = `播放失败: ${error.message}`;
-            console.error('音频播放错误:', error);
-          });
-      })
-      .catch(error => {
-        dom.result.textContent = `获取发音失败: ${error.message}`;
-        console.error('API请求错误:', error);
       });
+
+
+      // 添加最后一个课时
+      if (currentLesson.words.length > 0) {
+        lessons.push(currentLesson);
+      }
+
+
+      return lessons;
+    }
+
+
+    // 更新课时选择器 - 选中历史课时
+    function updateLessonSelector() {
+      const file = lessonWordLists[currentFile];
+      const lessonSelect = dom.lessonSelect;
+      
+      // 清空现有选项
+      lessonSelect.innerHTML = "";
+      
+      // 添加课时选项
+      file.lessons.forEach(lesson => {
+        const option = document.createElement("option");
+        option.value = lesson.id;
+        option.textContent = `${lesson.name} (${lesson.words.length}个单词)`;
+        lessonSelect.appendChild(option);
+      });
+      
+      // 确保当前课时有效
+      const hasCurrentLesson = file.lessons.some(lesson => lesson.id === currentLessonId);
+      if (!hasCurrentLesson && file.lessons.length > 0) {
+        currentLessonId = file.lessons[0].id;
+        currentIndex = 0;
+        saveCurrentProgress();
+      }
+      
+      // 设置选中的课时为历史记录
+      lessonSelect.value = currentLessonId;
+      
+      // 加载当前课时
+      loadCurrentLesson();
+    }
+
+
+    // 切换课时
+    function changeLesson() {
+      const selectedLessonId = parseInt(dom.lessonSelect.value);
+      if (selectedLessonId === currentLessonId) return;
+      
+      // 保存当前进度
+      saveCurrentProgress();
+      
+      // 更新当前课时
+      currentLessonId = selectedLessonId;
+      currentIndex = 0;
+      
+      // 加载新课时
+      loadCurrentLesson();
     }
 
 
@@ -786,7 +857,9 @@
       generateInputBoxes(wordObj);
       
       // 自动朗读单词
-      setTimeout(readWord, 500);
+      if (speechSynthAvailable) {
+        setTimeout(readWord, 500);
+      }
       
       // 更新统计
       updateStats();
@@ -1349,11 +1422,43 @@
     }
 
 
+    // 语音朗读功能
+    function readWord() {
+      if (!speechSynthAvailable) return;
+      
+      // 停止任何正在进行的语音合成
+      window.speechSynthesis.cancel();
+      
+      // 获取当前单词
+      const currentWord = isReviewMode 
+        ? wrongList[currentReviewIndex].word
+        : getCurrentLesson().words[currentIndex].word;
+      
+      // 创建语音合成实例
+      const utterance = new SpeechSynthesisUtterance(currentWord);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.9; // 稍微降低语速，便于学习
+      
+      // 设置朗读完成后的回调
+      utterance.onend = () => {
+        console.log(`朗读完成: ${currentWord}`);
+      };
+      
+      utterance.onerror = (event) => {
+        console.error(`语音合成错误: ${event.error}`);
+        dom.result.textContent = "语音合成出错，请稍后再试";
+      };
+      
+      // 开始朗读
+      window.speechSynthesis.speak(utterance);
+    }
+
+
     // 计算字符串相似度
     function calculateSimilarity(s1, s2) {
       if (s1 === s2) return 1;
       const longer = s1.length > s2.length ? s1 : s2;
-      const shorter = s1.length > s2.length ? s2 : s1;
+      const shorter = s1.length > s2.length ? s2 : s1; s2 : s1;
       const longerLen = longer.length;
       if (longerLen === 0) return 1.0;
       
@@ -1384,198 +1489,6 @@
         if (i > 0) costs[s2.length] = lastValue;
       }
       return costs[s2.length];
-    }
-
-
-    // 加载单词文件 - 核心修改：切换时加载对应单词库的历史数据
-    function loadSelectedWordFile() {
-      const selectedFile = dom.wordFileSelect.value;
-      if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
-      
-      // 保存当前单词库的进度
-      saveCurrentProgress();
-      
-      // 切换到新的单词库
-      currentFile = selectedFile;
-      
-      // 从全局数据中加载新单词库的历史数据
-      const fileData = allGameData[currentFile];
-      currentLessonId = fileData.currentLessonId;
-      currentIndex = fileData.currentIndex;
-      lessonStars = fileData.lessonStars;
-      wrongList = fileData.wrongList;
-      puzzleQuestionsUsed = fileData.puzzleQuestionsUsed;
-      
-      dom.fileNotification.textContent = "";
-      const file = lessonWordLists[currentFile];
-      
-      // 初始化当前文件的基础数据结构
-      if (!wrongList) wrongList = [];
-      if (!lessonStars) lessonStars = {};
-      if (!puzzleQuestionsUsed) puzzleQuestionsUsed = [];
-      
-      // 如果文件已加载，直接更新界面
-      if (file.loaded) {
-        updateLessonSelector();
-        return;
-      }
-      
-      // 否则加载文件
-      dom.fileNotification.textContent = `正在加载 ${file.name}...`;
-      
-      // 词库文件路径
-      const fileName = {
-        "threesh": "threeshang_words.txt",
-        "basic": "basic_words.txt"
-      }[currentFile];
-
-
-      // 读取并解析带课时的TXT文件
-      fetch(fileName)
-        .then(response => {
-          if (!response.ok) throw new Error("文件不存在或加载失败");
-          return response.text();
-        })
-        .then(text => {
-          const lessons = parseLessonFile(text);
-          
-          if (lessons.length === 0) {
-            throw new Error("未解析到有效课时，请检查文件格式");
-          }
-          
-          // 加载成功，更新数据
-          lessonWordLists[currentFile].lessons = lessons;
-          lessonWordLists[currentFile].loaded = true;
-          dom.fileNotification.textContent = `加载成功！共 ${lessons.length} 个课时，${lessons.reduce((total, lesson) => total + lesson.words.length, 0)} 个单词`;
-          
-          // 更新统计信息显示
-          document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
-          document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
-          
-          // 检查历史课时ID是否存在于当前单词库中，不存在则重置
-          const hasValidLesson = lessons.some(lesson => lesson.id === currentLessonId);
-          if (!hasValidLesson) {
-            currentLessonId = lessons[0].id;
-            currentIndex = 0;
-            saveCurrentProgress();
-          }
-          
-          // 更新课时选择器
-          updateLessonSelector();
-        })
-        .catch(error => {
-          dom.fileNotification.textContent = `加载失败：${error.message}`;
-          console.error("词库加载错误：", error);
-        });
-    }
-
-
-    // 解析带课时的词库文件
-    function parseLessonFile(text) {
-      const lessons = [];
-      let currentLesson = { id: 1, name: "第1课", words: [] };
-      let currentLessonId = 1;
-      let currentLessonName = `第${currentLessonId}课`;
-
-
-      // 按行分割，过滤空行和无效行
-      const lines = text.split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('//')); // 忽略注释行
-
-
-      lines.forEach(line => {
-        // 检测课时分隔符
-        const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
-        if (lessonMatch) {
-          // 保存当前课时（如果有单词）
-          if (currentLesson.words.length > 0) {
-            lessons.push(currentLesson);
-          }
-          // 创建新课时
-          currentLessonId = parseInt(lessonMatch[1]);
-          currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
-          currentLesson = {
-            id: currentLessonId,
-            name: currentLessonName,
-            words: []
-          };
-        } else {
-          // 解析单词行
-          const parts = line.split(',').map(p => p.trim());
-          if (parts.length >= 2) {
-            // 支持两种格式：
-            // 1. word,definition,phonetic
-            // 2. 序号,word,definition,phonetic
-            const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
-            if (wordIndex < parts.length) {
-              currentLesson.words.push({
-                word: parts[wordIndex],
-                definition: parts[wordIndex + 1],
-                phonetic: parts[wordIndex + 2] || '无'
-              });
-            }
-          }
-        }
-      });
-
-
-      // 添加最后一个课时
-      if (currentLesson.words.length > 0) {
-        lessons.push(currentLesson);
-      }
-
-
-      return lessons;
-    }
-
-
-    // 更新课时选择器 - 选中历史课时
-    function updateLessonSelector() {
-      const file = lessonWordLists[currentFile];
-      const lessonSelect = dom.lessonSelect;
-      
-      // 清空现有选项
-      lessonSelect.innerHTML = "";
-      
-      // 添加课时选项
-      file.lessons.forEach(lesson => {
-        const option = document.createElement("option");
-        option.value = lesson.id;
-        option.textContent = `${lesson.name} (${lesson.words.length}个单词)`;
-        lessonSelect.appendChild(option);
-      });
-      
-      // 确保当前课时有效
-      const hasCurrentLesson = file.lessons.some(lesson => lesson.id === currentLessonId);
-      if (!hasCurrentLesson && file.lessons.length > 0) {
-        currentLessonId = file.lessons[0].id;
-        currentIndex = 0;
-        saveCurrentProgress();
-      }
-      
-      // 设置选中的课时为历史记录
-      lessonSelect.value = currentLessonId;
-      
-      // 加载当前课时
-      loadCurrentLesson();
-    }
-
-
-    // 切换课时
-    function changeLesson() {
-      const selectedLessonId = parseInt(dom.lessonSelect.value);
-      if (selectedLessonId === currentLessonId) return;
-      
-      // 保存当前进度
-      saveCurrentProgress();
-      
-      // 更新当前课时
-      currentLessonId = selectedLessonId;
-      currentIndex = 0;
-      
-      // 加载新课时
-      loadCurrentLesson();
     }
 
 
