@@ -302,9 +302,9 @@
   <audio id="bgm" autoplay loop>
     <source src="https://cdn.pixabay.com/audio/2022/10/30/audio_46fdd201cc.mp3" type="audio/mpeg">
   </audio>
-  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></think>
-  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></think>
-  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></think>
+  <audio id="correct-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_e0b6f67a53.mp3"></audio>
+  <audio id="wrong-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_2307f9b816.mp3"></audio>
+  <audio id="reward-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_139c839a53.mp3"></audio>
 
 
   <!-- 连续正确提示 -->
@@ -312,6 +312,20 @@
 
 
   <script>
+    // API配置 - 请替换为您自己的密钥
+    const API_CONFIG = {
+      oxford: {
+        appId: "be22b666",       // 牛津词典API ID
+        appKey: "b6444886a80bdc60359c3584510e44ee",     // 牛津词典API密钥
+        baseUrl: "https://od-api-sandbox.oxforddictionaries.com/api/v2"
+      },
+      forvo: {
+        apiKey: "YOUR_FORVO_API_KEY",      // Forvo API密钥
+        baseUrl: "https://apifree.forvo.com/api"
+      }
+    };
+
+
     // 按课时组织的核心单词库
     const lessonWordLists = {
       "default": {
@@ -528,972 +542,157 @@
     };
 
 
-    // 初始化
-    function init() {
-      // 设置单词库选择器的选中值为保存的值
-      dom.wordFileSelect.value = currentFile;
+    // 检查语音服务支持情况
+    function checkSpeechServices() {
+      // 检查API密钥是否配置
+      const hasOxfordKeys = API_CONFIG.oxford.appId && API_CONFIG.oxford.appKey;
+      const hasForvoKey = API_CONFIG.forvo.apiKey;
       
-      // 初始化事件监听
-      dom.wordFileSelect.addEventListener('change', loadSelectedWordFile);
-      dom.lessonSelect.addEventListener('change', changeLesson);
-      
-      // 加载保存的单词库
-      loadSelectedWordFile();
-      initSpeechRecognition();
-      checkSpeechSynthesis();
-    }
-
-
-    // 检查语音合成支持
-    function checkSpeechSynthesis() {
-      if ('speechSynthesis' in window) {
-        speechSynthAvailable = true;
-        dom.readWordBtn.disabled = false;
-        dom.readWordBtn.title = "";
-      } else {
-        speechSynthAvailable = false;
+      if (!hasOxfordKeys && !hasForvoKey) {
         dom.readWordBtn.disabled = true;
-        dom.readWordBtn.title = "您的浏览器不支持语音合成";
-      }
-    }
-
-
-    // 加载单词文件 - 核心修改：切换时加载对应单词库的历史数据
-    function loadSelectedWordFile() {
-      const selectedFile = dom.wordFileSelect.value;
-      if (selectedFile === currentFile && lessonWordLists[currentFile].loaded) return;
-      
-      // 保存当前单词库的进度
-      saveCurrentProgress();
-      
-      // 切换到新的单词库
-      currentFile = selectedFile;
-      
-      // 从全局数据中加载新单词库的历史数据
-      const fileData = allGameData[currentFile];
-      currentLessonId = fileData.currentLessonId;
-      currentIndex = fileData.currentIndex;
-      lessonStars = fileData.lessonStars;
-      wrongList = fileData.wrongList;
-      puzzleQuestionsUsed = fileData.puzzleQuestionsUsed;
-      
-      dom.fileNotification.textContent = "";
-      const file = lessonWordLists[currentFile];
-      
-      // 初始化当前文件的基础数据结构
-      if (!wrongList) wrongList = [];
-      if (!lessonStars) lessonStars = {};
-      if (!puzzleQuestionsUsed) puzzleQuestionsUsed = [];
-      
-      // 如果文件已加载，直接更新界面
-      if (file.loaded) {
-        updateLessonSelector();
-        return;
+        dom.readWordBtn.title = "请配置API密钥以使用发音功能";
+        return false;
       }
       
-      // 否则加载文件
-      dom.fileNotification.textContent = `正在加载 ${file.name}...`;
-      
-      // 词库文件路径
-      const fileName = {
-        "threesh": "threeshang_words.txt",
-        "basic": "basic_words.txt"
-      }[currentFile];
-
-
-      // 读取并解析带课时的TXT文件
-      fetch(fileName)
-        .then(response => {
-          if (!response.ok) throw new Error("文件不存在或加载失败");
-          return response.text();
-        })
-        .then(text => {
-          const lessons = parseLessonFile(text);
-          
-          if (lessons.length === 0) {
-            throw new Error("未解析到有效课时，请检查文件格式");
-          }
-          
-          // 加载成功，更新数据
-          lessonWordLists[currentFile].lessons = lessons;
-          lessonWordLists[currentFile].loaded = true;
-          dom.fileNotification.textContent = `加载成功！共 ${lessons.length} 个课时，${lessons.reduce((total, lesson) => total + lesson.words.length, 0)} 个单词`;
-          
-          // 更新统计信息显示
-          document.querySelector('#statsInfo span:first-of-type').textContent = `总课时：${lessons.length}`;
-          document.querySelector('#statsInfo span:last-of-type').textContent = `总单词：${lessons.reduce((total, lesson) => total + lesson.words.length, 0)}`;
-          
-          // 检查历史课时ID是否存在于当前单词库中，不存在则重置
-          const hasValidLesson = lessons.some(lesson => lesson.id === currentLessonId);
-          if (!hasValidLesson) {
-            currentLessonId = lessons[0].id;
-            currentIndex = 0;
-            saveCurrentProgress();
-          }
-          
-          // 更新课时选择器
-          updateLessonSelector();
-        })
-        .catch(error => {
-          dom.fileNotification.textContent = `加载失败：${error.message}`;
-          console.error("词库加载错误：", error);
-        });
+      dom.readWordBtn.disabled = false;
+      return true;
     }
 
 
-    // 解析带课时的词库文件
-    function parseLessonFile(text) {
-      const lessons = [];
-      let currentLesson = { id: 1, name: "第1课", words: [] };
-      let currentLessonId = 1;
-      let currentLessonName = `第${currentLessonId}课`;
-
-
-      // 按行分割，过滤空行和无效行
-      const lines = text.split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('//')); // 忽略注释行
-
-
-      lines.forEach(line => {
-        // 检测课时分隔符
-        const lessonMatch = line.match(/Lesson\s*(\d+)\s*:?\s*(.*)/i);
-        if (lessonMatch) {
-          // 保存当前课时（如果有单词）
-          if (currentLesson.words.length > 0) {
-            lessons.push(currentLesson);
-          }
-          // 创建新课时
-          currentLessonId = parseInt(lessonMatch[1]);
-          currentLessonName = lessonMatch[2] ? lessonMatch[2] : `第${currentLessonId}课`;
-          currentLesson = {
-            id: currentLessonId,
-            name: currentLessonName,
-            words: []
-          };
-        } else {
-          // 解析单词行
-          const parts = line.split(',').map(p => p.trim());
-          if (parts.length >= 2) {
-            // 支持两种格式：
-            // 1. word,definition,phonetic
-            // 2. 序号,word,definition,phonetic
-            const wordIndex = parts[0].match(/^\d+$/) ? 1 : 0; // 判断第一部分是否为数字
-            if (wordIndex < parts.length) {
-              currentLesson.words.push({
-                word: parts[wordIndex],
-                definition: parts[wordIndex + 1],
-                phonetic: parts[wordIndex + 2] || '无'
-              });
-            }
-          }
-        }
-      });
-
-
-      // 添加最后一个课时
-      if (currentLesson.words.length > 0) {
-        lessons.push(currentLesson);
-      }
-
-
-      return lessons;
-    }
-
-
-    // 更新课时选择器 - 选中历史课时
-    function updateLessonSelector() {
-      const file = lessonWordLists[currentFile];
-      const lessonSelect = dom.lessonSelect;
-      
-      // 清空现有选项
-      lessonSelect.innerHTML = "";
-      
-      // 添加课时选项
-      file.lessons.forEach(lesson => {
-        const option = document.createElement("option");
-        option.value = lesson.id;
-        option.textContent = `${lesson.name} (${lesson.words.length}个单词)`;
-        lessonSelect.appendChild(option);
-      });
-      
-      // 确保当前课时有效
-      const hasCurrentLesson = file.lessons.some(lesson => lesson.id === currentLessonId);
-      if (!hasCurrentLesson && file.lessons.length > 0) {
-        currentLessonId = file.lessons[0].id;
-        currentIndex = 0;
-        saveCurrentProgress();
-      }
-      
-      // 设置选中的课时为历史记录
-      lessonSelect.value = currentLessonId;
-      
-      // 加载当前课时
-      loadCurrentLesson();
-    }
-
-
-    // 切换课时
-    function changeLesson() {
-      const selectedLessonId = parseInt(dom.lessonSelect.value);
-      if (selectedLessonId === currentLessonId) return;
-      
-      // 保存当前进度
-      saveCurrentProgress();
-      
-      // 更新当前课时
-      currentLessonId = selectedLessonId;
-      currentIndex = 0;
-      
-      // 加载新课时
-      loadCurrentLesson();
-    }
-
-
-    // 更新统计信息
-    function updateStats() {
-      const file = lessonWordLists[currentFile];
-      const lesson = getCurrentLesson();
-      
-      dom.stats.innerHTML = `
-        <div><i class="fa fa-check-circle text-green-500 mr-1"></i> 正确：<b>${getCorrectCount()}</b></div>
-        <div><i class="fa fa-times-circle text-red-500 mr-1"></i> 错误：<b>${wrongList.length}</b></div>
-        <div><i class="fa fa-book text-primary mr-1"></i> 进度：<b>${currentIndex + 1}/${lesson.words.length}</b></div>
-      `;
-    }
-
-
-    // 获取当前课时的正确单词数
-    function getCorrectCount() {
-      const lesson = getCurrentLesson();
-      const lessonWords = lesson.words.map(word => word.word.toLowerCase());
-      const wrongWords = wrongList.map(word => word.word.toLowerCase());
-      
-      // 计算正确数 = 已完成单词数 - 其中的错误单词数
-      return Math.min(currentIndex, lesson.words.length) - 
-             lessonWords.slice(0, currentIndex).filter(word => wrongWords.includes(word)).length;
-    }
-
-
-    // 获取当前课时
-    function getCurrentLesson() {
-      return lessonWordLists[currentFile].lessons.find(lesson => lesson.id === currentLessonId) || 
-             lessonWordLists[currentFile].lessons[0];
-    }
-
-
-    // 加载当前课时内容
-    function loadCurrentLesson() {
-      // 重置UI状态
-      dom.question.textContent = "";
-      dom.result.textContent = "";
-      dom.options.innerHTML = "";
-      dom.letterBox.innerHTML = "";
-      dom.similarityMeter.style.display = "none";
-      dom.streakReward.classList.add("hidden");
-      dom.nextBtn.style.display = "inline-block";
-      document.getElementById("continueBtn").style.display = "none";
-      answerCorrect = false;
-      
-      // 确保当前文件和课时有效
-      const file = lessonWordLists[currentFile];
-      if (!file.loaded || file.lessons.length === 0) {
-        dom.instruction.textContent = "请先选择有效的单词库和课时";
-        dom.definition.textContent = "";
-        dom.phonetic.textContent = "";
-        return;
-      }
-      
-      // 获取当前课时
-      const lesson = getCurrentLesson();
-      if (!lesson) {
-        dom.instruction.textContent = "未找到指定课时";
-        dom.definition.textContent = "";
-        dom.phonetic.textContent = "";
-        return;
-      }
-      
-      // 确保当前索引有效
-      if (currentIndex >= lesson.words.length) {
-        currentIndex = 0;
-      }
-      
-      // 错题回顾模式
-      if (isReviewMode) {
-        document.querySelector('button[onclick="exitReview()"]').style.display = "inline-block";
+    // 牛津词典API获取发音
+    async function getOxfordPronunciation(word) {
+      try {
+        const url = `${API_CONFIG.oxford.baseUrl}/entries/en-us/${encodeURIComponent(word)}?fields=pronunciations`;
         
-        if (wrongList.length === 0) {
-          dom.instruction.textContent = "🎉 恭喜你攻克了所有错题！";
-          dom.definition.textContent = "继续加油哦！";
-          dom.phonetic.textContent = "";
-          dom.nextBtn.style.display = "none";
-          dom.prevBtn.style.display = "none";
-          return;
-        }
-        
-        currentReviewIndex = Math.min(currentReviewIndex, wrongList.length - 1);
-        const wordObj = wrongList[currentReviewIndex];
-        dom.instruction.innerHTML = `<span class="level-badge">错题回顾</span> 第 ${currentReviewIndex + 1}/${wrongList.length} 题`;
-        dom.definition.textContent = `中文提示：${wordObj.definition}`;
-        dom.phonetic.textContent = `音标：${wordObj.phonetic || '无'}`;
-        generateInputBoxes(wordObj);
-        return;
-      }
-      
-      // 正常闯关模式
-      document.querySelector('button[onclick="exitReview()"]').style.display = "none";
-      
-      // 检查是否需要显示谜题（完成课时后）
-      if (currentIndex >= lesson.words.length && !inPuzzle && !inRewardPuzzle) {
-        showPuzzle();
-        return;
-      }
-      
-      // 显示当前单词
-      const wordObj = lesson.words[currentIndex];
-      dom.instruction.innerHTML = `<span class="level-badge">${lesson.name}</span> 第 ${currentIndex + 1}/${lesson.words.length} 词`;
-      dom.definition.textContent = `中文提示：${wordObj.definition}`;
-      dom.phonetic.textContent = `音标：${wordObj.phonetic || '无'}`;
-      generateInputBoxes(wordObj);
-      
-      // 自动朗读单词
-      if (speechSynthAvailable) {
-        setTimeout(readWord, 500);
-      }
-      
-      // 更新统计
-      updateStats();
-      
-      // 更新按钮状态
-      dom.nextBtn.textContent = isReviewMode ? "下一个错题" : "跳过此题";
-      dom.prevBtn.disabled = isReviewMode ? currentReviewIndex <= 0 : currentIndex <= 0;
-    }
-
-
-    // 生成输入框
-    function generateInputBoxes(wordObj) {
-      // 清空现有内容
-      dom.letterBox.innerHTML = "";
-      
-      // 生成所有字母的输入框
-      for (let i = 0; i < wordObj.word.length; i++) {
-        const input = document.createElement("input");
-        input.type = "text";
-        input.maxLength = 1;
-        input.className = "word-input";
-        input.dataset.index = i;
-        // 确保输入转换为小写
-        input.addEventListener('input', function() {
-          if (this.value) {
-            this.value = this.value.toLowerCase();
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'app_id': API_CONFIG.oxford.appId,
+            'app_key': API_CONFIG.oxford.appKey
           }
         });
-        addInputListeners(input);
-        dom.letterBox.appendChild(input);
-      }
-      
-      // 聚焦第一个输入框
-      dom.letterBox.querySelector("input")?.focus();
-    }
-
-
-    // 输入框事件监听
-    function addInputListeners(input) {
-      // 输入后自动跳到下一个
-      input.addEventListener('input', function() {
-        if (this.value) {
-          const next = this.nextElementSibling;
-          if (next?.tagName === "INPUT") {
-            next.focus();
-          } else {
-            checkAnswer(); // 最后一个输入框填满后自动检查
-          }
-        }
-      });
-
-
-      // 退格键处理
-      input.addEventListener('keydown', function(e) {
-        if (e.key === 'Backspace' && !this.value) {
-          const prev = this.previousElementSibling;
-          if (prev?.tagName === "INPUT") {
-            prev.focus();
-          }
-        }
-      });
-    }
-
-
-    // 检查答案
-    function checkAnswer() {
-      // 获取当前单词
-      const wordObj = isReviewMode 
-        ? wrongList[currentReviewIndex]
-        : getCurrentLesson().words[currentIndex];
-      
-      if (!wordObj) return;
-      
-      // 获取用户输入（确保全部转为小写）
-      const inputs = dom.letterBox.querySelectorAll("input");
-      let userAnswer = "";
-      inputs.forEach(input => userAnswer += (input.value || '').toLowerCase());
-
-
-      // 检查是否填满
-      if (userAnswer.length !== wordObj.word.length) return;
-
-
-      // 相似度计算
-      dom.similarityMeter.style.display = "block";
-      const similarity = calculateSimilarity(userAnswer, wordObj.word.toLowerCase());
-      dom.similarityFill.style.width = `${similarity * 100}%`;
-
-
-      // 判断对错
-      const isCorrect = userAnswer === wordObj.word.toLowerCase() || 
-        (pronunciationVariants[wordObj.word.toLowerCase()]?.includes(userAnswer) ?? false);
-
-
-      // 标记输入框状态
-      inputs.forEach((input, i) => {
-        const correctChar = wordObj.word[i].toLowerCase();
-        input.className = `word-input ${input.value.toLowerCase() === correctChar ? 'correct' : 'wrong'}`;
-      });
-
-
-      // 处理结果
-      if (isCorrect) {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
-        dom.result.textContent = `🎉 正确！单词：${wordObj.word}`;
-        dom.correctSound.play();
-        answerCorrect = true;
-        document.getElementById("continueBtn").style.display = "inline-block";
-        dom.nextBtn.style.display = "none";
-        currentStreak++;
         
-        // 提示用户朗读单词
-        setTimeout(() => {
-          dom.result.textContent += " 请朗读单词以继续下一题";
-          dom.startReadingBtn.focus();
-        }, 500);
-        
-        // 检查连续正确奖励
-        if (streakRewards[currentStreak]) {
-          showReward(currentStreak);
-        }
-      } else {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
-        dom.result.textContent = `❌ 错误！正确单词：${wordObj.word}`;
-        dom.wrongSound.play();
-        currentStreak = 0;
-        
-        // 添加到错题本（去重）
-        if (!wrongList.some(w => w.word.toLowerCase() === wordObj.word.toLowerCase())) {
-          wrongList.push(wordObj);
-        }
-
-
-        // 高亮错误字母1秒后清空
-        setTimeout(() => {
-          const inputs = dom.letterBox.querySelectorAll("input");
-          inputs.forEach((input, i) => {
-            const correctChar = wordObj.word[i].toLowerCase();
-            if (input.value.toLowerCase() !== correctChar) {
-              input.classList.add('highlight');
-            }
-          });
-          
-          // 1秒后清空输入框
-          setTimeout(() => {
-            inputs.forEach(input => {
-              input.value = '';
-              input.className = 'word-input';
-              input.classList.remove('highlight');
-            });
-            dom.letterBox.querySelector("input")?.focus();
-          }, 1000);
-        }, 500);
-      }
-      
-      // 保存进度
-      saveCurrentProgress();
-      updateStats();
-    }
-
-
-    // 显示连续正确效果
-    function showStreakEffect() {
-      const streakEl = document.getElementById("streakEffect");
-      streakEl.textContent = `+${currentStreak} 连击！`;
-      streakEl.style.display = "block";
-      setTimeout(() => {
-        streakEl.style.display = "none";
-      }, 1000);
-    }
-
-
-    // 下一题处理
-    function nextQuestion() {
-      // 保存当前进度
-      saveCurrentProgress();
-      
-      // 错题回顾模式
-      if (isReviewMode) {
-        currentReviewIndex++;
-        loadCurrentLesson();
-        return;
-      }
-      
-      // 正常模式
-      currentIndex++;
-      
-      // 检查是否完成当前课时
-      const lesson = getCurrentLesson();
-      if (currentIndex >= lesson.words.length && !inPuzzle && !inRewardPuzzle) {
-        // 显示谜题
-        showPuzzle();
-      } else {
-        // 继续当前课时
-        loadCurrentLesson();
-      }
-    }
-
-
-    // 上一题
-    function prevQuestion() {
-      if (isReviewMode) {
-        if (currentReviewIndex > 0) {
-          currentReviewIndex--;
-        }
-      } else if (currentIndex > 0) {
-        currentIndex--;
-        // 调整连续正确计数
-        if (currentStreak > 0) currentStreak--;
-      }
-      
-      // 保存进度
-      saveCurrentProgress();
-      loadCurrentLesson();
-    }
-
-
-    // 跳过当前题
-    function submitAnswer() {
-      if (isReviewMode) {
-        currentReviewIndex++;
-        loadCurrentLesson();
-        return;
-      }
-
-
-      if (inPuzzle) {
-        // 谜题跳过，进入下一课
-        const lessons = lessonWordLists[currentFile].lessons;
-        const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
-        
-        if (currentLessonIndex + 1 < lessons.length) {
-          currentLessonId = lessons[currentLessonIndex + 1].id;
-        } else {
-          currentLessonId = lessons[0].id; // 循环到第一课时
+        if (!response.ok) {
+          throw new Error(`Oxford API error: ${response.status}`);
         }
         
-        currentIndex = 0;
-        inPuzzle = false;
-        saveCurrentProgress();  // 保存进度
-        loadCurrentLesson();
-        return;
-      }
-      
-      // 奖励谜题跳过
-      if (inRewardPuzzle) {
-        inRewardPuzzle = false;
-        nextQuestion();
-        return;
-      }
-
-
-      // 正常题跳过（加入错题）
-      const lesson = getCurrentLesson();
-      const currentWord = lesson.words[currentIndex];
-      
-      // 添加到错题本（去重）
-      if (!wrongList.some(w => w.word.toLowerCase() === currentWord.word.toLowerCase())) {
-        wrongList.push(currentWord);
-      }
-      
-      currentStreak = 0;
-      currentIndex++;
-      saveCurrentProgress();  // 保存进度
-      loadCurrentLesson();
-    }
-
-
-    // 显示课时完成谜题
-    function showPuzzle() {
-      inPuzzle = true;
-      const lesson = getCurrentLesson();
-      
-      // 选择未使用的谜题
-      let availablePuzzles = puzzleQuestions.filter((_, index) => 
-        !puzzleQuestionsUsed.includes(index)
-      );
-      
-      // 如果所有谜题都用过了，重置
-      if (availablePuzzles.length === 0) {
-        availablePuzzles = puzzleQuestions;
-        puzzleQuestionsUsed = [];
-      }
-      
-      // 随机选择一个谜题
-      const puzzleIndex = Math.floor(Math.random() * availablePuzzles.length);
-      const puzzle = availablePuzzles[puzzleIndex];
-      puzzleQuestionsUsed.push(puzzleQuestions.indexOf(puzzle));
-
-
-      // 显示谜题
-      dom.instruction.innerHTML = `<span class="level-badge">${lesson.name} 完成挑战</span> 恭喜完成本课时，来挑战一个小谜题吧！`;
-      dom.question.textContent = puzzle.question;
-      dom.definition.textContent = "请选择正确答案：";
-      dom.phonetic.textContent = "";
-      dom.letterBox.innerHTML = "";
-
-
-      // 生成选项
-      puzzle.options.forEach(option => {
-        const btn = document.createElement("button");
-        btn.className = "game-btn bg-gray-200 text-gray-700 w-full text-left mb-2";
-        btn.textContent = option;
-        btn.onclick = () => checkPuzzleAnswer(puzzle, option, false);
-        dom.options.appendChild(btn);
-      });
-    }
-
-
-    // 显示连续答对奖励谜题
-    function showRewardPuzzle() {
-      inRewardPuzzle = true;
-      const lesson = getCurrentLesson();
-      
-      // 随机选择一个奖励谜题
-      rewardPuzzleIndex = Math.floor(Math.random() * rewardPuzzles.length);
-      const puzzle = rewardPuzzles[rewardPuzzleIndex];
-
-
-      // 显示谜题
-      dom.instruction.innerHTML = `<span class="level-badge">🎉 连续答对奖励</span> 恭喜连续答对5题！来挑战一个奖励谜题吧！`;
-      dom.question.textContent = puzzle.question;
-      dom.definition.textContent = "请选择正确答案：";
-      dom.phonetic.textContent = "";
-      dom.letterBox.innerHTML = "";
-      dom.streakReward.classList.add("hidden");
-
-
-      // 生成选项
-      puzzle.options.forEach(option => {
-        const btn = document.createElement("button");
-        btn.className = "game-btn bg-yellow-200 text-yellow-800 w-full text-left mb-2";
-        btn.textContent = option;
-        btn.onclick = () => checkPuzzleAnswer(puzzle, option, true);
-        dom.options.appendChild(btn);
-      });
-    }
-
-
-    // 检查谜题答案
-    function checkPuzzleAnswer(puzzle, selected, isRewardPuzzle) {
-      const buttons = dom.options.querySelectorAll("button");
-      buttons.forEach(btn => {
-        btn.disabled = true;
-        if (btn.textContent === puzzle.answer) {
-          btn.className = "game-btn bg-green-500 text-white w-full text-left mb-2";
-        } else if (btn.textContent === selected) {
-          btn.className = "game-btn bg-red-500 text-white w-full text-left mb-2";
-        }
-      });
-
-
-      // 处理结果
-      if (selected === puzzle.answer) {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-green-100 text-green-800";
-        dom.result.textContent = "🎉 恭喜你答对了！获得额外奖励！";
-        dom.correctSound.play();
+        const data = await response.json();
         
-        // 奖励星星
-        lessonStars[currentLessonId] = Math.min((lessonStars[currentLessonId] || 0) + 1, 3);
-        dom.result.textContent += ` 当前课时星星：${lessonStars[currentLessonId]}/3 ⭐`;
-      } else {
-        dom.result.className = "mt-4 p-4 rounded-lg bg-red-100 text-red-800";
-        dom.result.textContent = `❌ 正确答案是：${puzzle.answer}`;
-        dom.wrongSound.play();
-      }
-
-
-      // 保存进度
-      saveCurrentProgress();
-      
-      // 非奖励谜题（课时完成谜题）的处理
-      if (!isRewardPuzzle) {
-        // 2秒后进入下一课
-        setTimeout(() => {
-          const lessons = lessonWordLists[currentFile].lessons;
-          const currentLessonIndex = lessons.findIndex(lesson => lesson.id === currentLessonId);
-          
-          // 进入下一课
-          if (currentLessonIndex + 1 < lessons.length) {
-            currentLessonId = lessons[currentLessonIndex + 1].id;
-          } else {
-            // 如果是最后一课，循环到第一课时
-            currentLessonId = lessons[0].id;
-            dom.result.textContent += " 恭喜你完成了所有课时！将从第一课时重新开始。";
-          }
-          
-          currentIndex = 0;
-          inPuzzle = false;
-          saveCurrentProgress();  // 保存进度
-          loadCurrentLesson();
-          
-          // 更新课时选择器
-          dom.lessonSelect.value = currentLessonId;
-        }, 2000);
-      } else {
-        // 奖励谜题的处理
-        setTimeout(() => {
-          inRewardPuzzle = false;
-          nextQuestion();
-        }, 2000);
-      }
-    }
-
-
-    // 语音识别初始化
-    function initSpeechRecognition() {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        dom.startReadingBtn.disabled = true;
-        dom.startReadingBtn.title = "你的浏览器不支持语音识别";
-        return;
-      }
-
-
-      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = 'en-US';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.toLowerCase();
-        
-        // 获取当前单词（转为小写）
-        const currentWord = isReviewMode 
-          ? wrongList[currentReviewIndex].word.toLowerCase()
-          : getCurrentLesson().words[currentIndex].word.toLowerCase();
-        
-        // 检查语音是否匹配单词（包括变体）
-        const variants = [currentWord, ...(pronunciationVariants[currentWord] || [])];
-        const isMatch = variants.some(variant => 
-          transcript.includes(variant) || variant.includes(transcript)
-        );
-
-
-        // 处理识别结果
-        if (isMatch) {
-          if (answerCorrect) {
-            dom.result.textContent = `🎉 语音识别成功！单词：${currentWord}`;
-            setTimeout(() => {
-              // 移除错题（如果在复习模式）
-              if (isReviewMode) {
-                wrongList = wrongList.filter(w => w.word.toLowerCase() !== currentWord);
-              }
+        // 提取发音URL (优先选择音频)
+        if (data.results && data.results.length > 0 && 
+            data.results[0].lexicalEntries && 
+            data.results[0].lexicalEntries[0].entries &&
+            data.results[0].lexicalEntries[0].entries[0].pronunciations) {
               
-              nextQuestion();
-            }, 1000);
-          } else {
-            dom.result.textContent = `语音识别：${transcript}，请先正确拼写单词`;
-          }
-        } else {
-          dom.result.textContent = `未能识别："${transcript}"，请尝试再次朗读 "${currentWord}"`;
+            const pronunciations = data.results[0].lexicalEntries[0].entries[0].pronunciations;
+            // 查找美式发音的音频URL
+            const audioPron = pronunciations.find(p => 
+              p.dialects && p.dialects.includes('American English') && p.audioFile
+            );
+            
+            if (audioPron && audioPron.audioFile) {
+              return audioPron.audioFile;
+            }
         }
-      };
-
-
-      recognition.onend = () => {
-        isListening = false;
-        dom.startReadingBtn.textContent = "开始朗读";
-        dom.startReadingBtn.classList.remove("listening");
-      };
-    }
-
-
-    // 切换语音识别状态
-    function toggleListening() {
-      if (!recognition) return;
-      
-      if (isListening) {
-        recognition.stop();
-        isListening = false;
-        dom.startReadingBtn.textContent = "开始朗读";
-        dom.startReadingBtn.classList.remove("listening");
-      } else {
-        recognition.start();
-        isListening = true;
-        dom.startReadingBtn.textContent = "正在聆听...";
-        dom.startReadingBtn.classList.add("listening");
-        dom.result.textContent = "请朗读单词...";
+        
+        // 未找到发音
+        throw new Error("No pronunciation found in Oxford API");
+      } catch (error) {
+        console.error("Oxford API error:", error);
+        return null;
       }
     }
 
 
-    // 保存当前进度 - 核心修改：按单词库独立保存
-    function saveCurrentProgress() {
-      // 更新当前单词库的数据
-      allGameData[currentFile] = {
-        currentLessonId,
-        currentIndex,
-        lessonStars,
-        wrongList,
-        puzzleQuestionsUsed
-      };
-      
-      // 保存到localStorage
-      localStorage.setItem('wordGameData', JSON.stringify(allGameData));
-    }
-
-
-    // 显示奖励
-    function showReward(streak) {
-      const reward = streakRewards[streak];
-      dom.rewardMessage.innerHTML = `${reward.description}<br>${reward.action()}`;
-      dom.streakReward.classList.remove("hidden");
-      dom.rewardSound.play();
-      showStreakEffect();
-    }
-
-
-    // 领取奖励
-    function claimReward() {
-      // 如果是连续5题的奖励，直接触发奖励谜题
-      if (currentStreak === 5) {
-        dom.streakReward.classList.add("hidden");
-        showRewardPuzzle();
-      } else {
-        dom.streakReward.classList.add("hidden");
+    // Forvo API获取发音
+    async function getForvoPronunciation(word) {
+      try {
+        const url = `${API_CONFIG.forvo.baseUrl}/word/${encodeURIComponent(word)}/en-us/?key=${API_CONFIG.forvo.apiKey}&format=json&limit=1`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Forvo API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // 提取发音URL
+        if (data.items && data.items.length > 0 && data.items[0].pathmp3) {
+          return data.items[0].pathmp3;
+        }
+        
+        throw new Error("No pronunciation found in Forvo API");
+      } catch (error) {
+        console.error("Forvo API error:", error);
+        return null;
       }
     }
 
 
-    // 显示错题
-    function showMistakes() {
-      isReviewMode = true;
-      currentReviewIndex = 0;
-      loadCurrentLesson();
-    }
-
-
-    // 退出复习模式
-    function exitReview() {
-      isReviewMode = false;
-      loadCurrentLesson();
-    }
-
-
-    // 重置进度 - 只重置当前单词库
-    function resetProgress() {
-      if (confirm(`确定要重置"${lessonWordLists[currentFile].name}"的所有进度吗？`)) {
-        // 重置当前单词库的数据
-        const file = lessonWordLists[currentFile];
-        currentLessonId = file.lessons.length > 0 ? file.lessons[0].id : 1;
-        currentIndex = 0;
-        lessonStars = {};
-        wrongList = [];
-        puzzleQuestionsUsed = [];
-        
-        // 保存重置后的状态
-        saveCurrentProgress();
-        
-        // 刷新界面
-        dom.lessonSelect.value = currentLessonId;
-        loadCurrentLesson();
-        updateStats();
-        
-        // 显示提示
-        dom.result.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
-        dom.result.textContent = "✅ 进度已重置，从第一课时开始吧！";
-      }
-    }
-
-
-    // 语音朗读功能
-    function readWord() {
-      if (!speechSynthAvailable) return;
-      
-      // 停止任何正在进行的语音合成
-      window.speechSynthesis.cancel();
+    // 播放单词发音 (优先使用Oxford，失败则使用Forvo)
+    async function readWord() {
+      if (!checkSpeechServices()) return;
       
       // 获取当前单词
       const currentWord = isReviewMode 
         ? wrongList[currentReviewIndex].word
         : getCurrentLesson().words[currentIndex].word;
       
-      // 创建语音合成实例
-      const utterance = new SpeechSynthesisUtterance(currentWord);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.9; // 稍微降低语速，便于学习
+      // 显示加载状态
+      dom.readWordBtn.disabled = true;
+      dom.readWordBtn.textContent = "加载发音中...";
+      dom.result.textContent = `正在加载 "${currentWord}" 的发音...`;
       
-      // 设置朗读完成后的回调
-      utterance.onend = () => {
-        console.log(`朗读完成: ${currentWord}`);
-      };
-      
-      utterance.onerror = (event) => {
-        console.error(`语音合成错误: ${event.error}`);
-        dom.result.textContent = "语音合成出错，请稍后再试";
-      };
-      
-      // 开始朗读
-      window.speechSynthesis.speak(utterance);
-    }
-
-
-    // 计算字符串相似度
-    function calculateSimilarity(s1, s2) {
-      if (s1 === s2) return 1;
-      const longer = s1.length > s2.length ? s1 : s2;
-      const shorter = s1.length > s2.length ? s2 : s1; s2 : s1;
-      const longerLen = longer.length;
-      if (longerLen === 0) return 1.0;
-      
-      return (longerLen - editDistance(longer, shorter)) / parseFloat(longerLen);
-    }
-
-
-    // 编辑距离算法
-    function editDistance(s1, s2) {
-      s1 = s1.toLowerCase();
-      s2 = s2.toLowerCase();
-      
-      const costs = [];
-      for (let i = 0; i <= s1.length; i++) {
-        let lastValue = i;
-        for (let j = 0; j <= s2.length; j++) {
-          if (i === 0) costs[j] = j;
-          else {
-            if (j > 0) {
-              let newValue = costs[j - 1];
-              if (s1.charAt(i - 1) !== s2.charAt(j - 1))
-                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-              costs[j - 1] = lastValue;
-              lastValue = newValue;
-            }
-          }
+      try {
+        let audioUrl = null;
+        
+        // 1. 尝试从Oxford API获取发音
+        if (API_CONFIG.oxford.appId && API_CONFIG.oxford.appKey) {
+          audioUrl = await getOxfordPronunciation(currentWord);
         }
-        if (i > 0) costs[s2.length] = lastValue;
+        
+        // 2. 如果Oxford失败，尝试Forvo API
+        if (!audioUrl && API_CONFIG.forvo.apiKey) {
+          audioUrl = await getForvoPronunciation(currentWord);
+        }
+        
+        // 3. 播放发音
+        if (audioUrl) {
+          // 创建音频元素播放
+          const audio = new Audio(audioUrl);
+          
+          audio.onplay = () => {
+            dom.result.textContent = `正在播放 "${currentWord}" 的发音...`;
+          };
+          
+          audio.onended = () => {
+            dom.result.textContent = `已播放 "${currentWord}" 的发音`;
+            resetReadButton();
+          };
+          
+          audio.onerror = (error) => {
+            throw new Error(`音频播放失败: ${error.message}`);
+          };
+          
+          audio.play();
+        } else {
+          throw new Error("无法获取单词发音");
+        }
+      } catch (error) {
+        console.error("发音错误:", error);
+        dom.result.textContent = `获取发音失败: ${error.message}`;
+        resetReadButton();
       }
-      return costs[s2.length];
     }
 
 
-    // 页面加载完成后初始化游戏
-    window.onload = init;
-  </script>
-</body>
-</html>
+    // 重置发音按钮状态
+    function resetReadButton() {
+      dom.readWordBtn.disabled
